@@ -11,6 +11,11 @@ class LandingSimulator {
     constructor() {
         console.log("Iniciando simulador...");
         try {
+            // --- Audio setup ---
+            this.backgroundAudio = new Audio('som.mp3');
+            this.backgroundAudio.loop = true;
+            this.backgroundAudio.volume = 1;
+            this._audioStarted = false;
             this.gameOver = false;
             this.gameOverDisplayed = false;
             this.playerHealth = 100;
@@ -857,6 +862,32 @@ class LandingSimulator {
     }
 
     animate() {
+        // --- Audio control: play when flying, pause when stopped ---
+        if (this.planeState && typeof this.planeState.speed !== 'undefined') {
+            if (this.planeState.speed > 0.2) {
+                if (!this.backgroundAudio.paused && this._audioStarted) {
+                    // already playing
+                } else {
+                    // Play only after user interaction (browser policy)
+                    if (!this._audioStarted) {
+                        const playAudio = () => {
+                            this.backgroundAudio.play();
+                            this._audioStarted = true;
+                            window.removeEventListener('keydown', playAudio);
+                            window.removeEventListener('mousedown', playAudio);
+                        };
+                        window.addEventListener('keydown', playAudio);
+                        window.addEventListener('mousedown', playAudio);
+                    } else {
+                        this.backgroundAudio.play();
+                    }
+                }
+            } else {
+                if (!this.backgroundAudio.paused) {
+                    this.backgroundAudio.pause();
+                }
+            }
+        }
         if (this.gameOver) {
             this.showGameOverScreen();
             return;
@@ -911,13 +942,17 @@ class LandingSimulator {
                     if (distance < 1.0) { // Raio de colisão ajustado
                         console.log('Inimigo atingido!');
                         
+                         
+                        
                         // Remover bala
                         this.scene.remove(bullet);
                         this.enemyManager.bullets.splice(i, 1);
                         
                         // Criar explosão
                         this.enemyManager.createExplosion(enemy.mesh.position);
-                        
+                        // Pontuação por tiro acertado
+                        this.enemyManager.score += 50;
+                        this.enemyManager.updateScoreDisplay();
                         // Dano no inimigo
                         enemy.health -= 25;
                         if (enemy.health <= 0) {
@@ -979,7 +1014,9 @@ class LandingSimulator {
                         
                         // Criar explosão
                         this.tankManager.createExplosion(tank.mesh.position);
-                        
+                        // Pontuação por tiro acertado
+                        this.enemyManager.score += 50;
+                        this.enemyManager.updateScoreDisplay();
                         // Dano no tanque
                         tank.health -= 20; // Tanques são mais resistentes
                         if (tank.health <= 0) {
@@ -1109,8 +1146,8 @@ class LandingSimulator {
 
                 if (onRunway) {
                     // Só nivela o avião se estiver realmente parado
-                    if (this.planeState.speed < 3) {
-                        this.planeState.pitch = 0;
+                    if (this.planeState.speed < 2) {
+                       // this.planeState.pitch = 0;
                         this.airplane.rotation.x = 0;
                     }
                     this.planeState.roll = 0;
