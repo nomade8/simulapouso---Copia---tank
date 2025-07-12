@@ -348,7 +348,7 @@ class EnemyManager {
             size: 0.2,
             vertexColors: true,
             transparent: true,
-            opacity: 0.8,
+            opacity: 1,
             sizeAttenuation: true
         });
 

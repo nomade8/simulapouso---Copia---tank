@@ -92,7 +92,7 @@ class LandingSimulator {
             // Variáveis de simulação
             this.planeState = {
                 speed: 7,
-                altitude: 50,
+                altitude: 400,
                 fuel: 100,
                 rotation: 0, // Yaw
                 pitch: 0,    // Pitch
@@ -652,8 +652,8 @@ class LandingSimulator {
     }
 
     updateHUD() {
-        document.getElementById('speed').textContent = Math.round(this.planeState.speed);
-        document.getElementById('altitude').textContent = Math.round(this.planeState.altitude);
+        document.getElementById('speed').textContent = Math.round(this.planeState.speed*60);
+        document.getElementById('altitude').textContent = Math.round(this.planeState.altitude*5);
         document.getElementById('fuel').textContent = Math.round(this.planeState.fuel);
     }
 
@@ -775,7 +775,7 @@ class LandingSimulator {
         this.playerHealth = 100;
         
         // Resetar posição e estado do avião
-        this.airplane.position.set(0, 50, 0);
+        this.airplane.position.set(0, 400, 0);
         this.planeState = {
             speed: 7,
             altitude: 400,
@@ -1103,7 +1103,7 @@ class LandingSimulator {
                 const planePos = this.airplane.position;
                 const runwayPos = this.runwayMesh.position;
                 const runwayWidth = 5;
-                const runwayLength = 30;
+                const runwayLength = 50;
                 onRunway = Math.abs(planePos.x - runwayPos.x) < runwayWidth / 2 &&
                            Math.abs(planePos.z - runwayPos.z) < runwayLength / 2;
 
@@ -1182,7 +1182,7 @@ class LandingSimulator {
 
         // Consumo de combustível
         if (this.planeState.fuel > 0 && this.planeState.speed > 0) {
-            this.planeState.fuel -= 0.005 * (this.planeState.speed / 100);
+            this.planeState.fuel -= 0.05 * (this.planeState.speed / 100);
             this.planeState.fuel = Math.max(this.planeState.fuel, 0);
         } else if (this.planeState.fuel <= 0) {
             this.planeState.speed = Math.max(this.planeState.speed - 0.5, 0);
