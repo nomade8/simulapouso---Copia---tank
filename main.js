@@ -11,11 +11,6 @@ class LandingSimulator {
     constructor() {
         console.log("Iniciando simulador...");
         try {
-            // --- Audio setup ---
-            this.backgroundAudio = new Audio('som.mp3');
-            this.backgroundAudio.loop = true;
-            this.backgroundAudio.volume = 1;
-            this._audioStarted = false;
             this.gameOver = false;
             this.gameOverDisplayed = false;
             this.playerHealth = 100;
@@ -862,32 +857,7 @@ class LandingSimulator {
     }
 
     animate() {
-        // --- Audio control: play when flying, pause when stopped ---
-        if (this.planeState && typeof this.planeState.speed !== 'undefined') {
-            if (this.planeState.speed > 0.2) {
-                if (!this.backgroundAudio.paused && this._audioStarted) {
-                    // already playing
-                } else {
-                    // Play only after user interaction (browser policy)
-                    if (!this._audioStarted) {
-                        const playAudio = () => {
-                            this.backgroundAudio.play();
-                            this._audioStarted = true;
-                            window.removeEventListener('keydown', playAudio);
-                            window.removeEventListener('mousedown', playAudio);
-                        };
-                        window.addEventListener('keydown', playAudio);
-                        window.addEventListener('mousedown', playAudio);
-                    } else {
-                        this.backgroundAudio.play();
-                    }
-                }
-            } else {
-                if (!this.backgroundAudio.paused) {
-                    this.backgroundAudio.pause();
-                }
-            }
-        }
+        // ...som removido...
         if (this.gameOver) {
             this.showGameOverScreen();
             return;
