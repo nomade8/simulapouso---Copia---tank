@@ -258,7 +258,7 @@ class EnemyManager {
 
         const bulletGeometry = new THREE.SphereGeometry(0.08, 8, 8);
         const bulletMaterial = new THREE.MeshBasicMaterial({
-            color: isEnemy ? 0xff0000 : 0x00ff00
+            color: isEnemy ? 0xff0000 : '#042647'
         });
         const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
         

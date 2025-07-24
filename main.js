@@ -675,8 +675,10 @@ class LandingSimulator {
                     shootPosition,
                     shootDirection
                 );
+                this.playShotgunSound();
             }
         });
+   
 
         const keyStates = {
             ArrowUp: false,
@@ -856,6 +858,19 @@ class LandingSimulator {
         }
     }
 
+    // Reproduz som de explosão
+    playExplosionSound() {
+        const audio = new Audio('explosion.mp3');
+        audio.volume = 0.1;
+        audio.play();
+    }
+     // Reproduz som de tiro do avião do jogador
+    playShotgunSound() {
+        const audio = new Audio('shotgun.mp3');
+        audio.volume = 0.05;
+        audio.play();
+    }
+
     animate() {
         // ...som removido...
         if (this.gameOver) {
@@ -881,14 +896,12 @@ class LandingSimulator {
                     console.log('Jogador atingido!');
                     this.playerHealth -= 10;
                     this.updateHealthBar();
-                    
                     // Remover bala
                     this.scene.remove(bullet);
                     this.enemyManager.enemyBullets.splice(i, 1);
-                    
                     // Criar explosão
                     this.enemyManager.createExplosion(this.airplane.position);
-                    
+                    this.playExplosionSound();
                     if (this.playerHealth <= 0) {
                         this.playerHealth = 0;
                         this.updateHealthBar();
@@ -911,21 +924,19 @@ class LandingSimulator {
                     const distance = bullet.position.distanceTo(enemy.mesh.position);
                     if (distance < 1.0) { // Raio de colisão ajustado
                         console.log('Inimigo atingido!');
-                        
-                         
-                        
                         // Remover bala
                         this.scene.remove(bullet);
                         this.enemyManager.bullets.splice(i, 1);
-                        
                         // Criar explosão
                         this.enemyManager.createExplosion(enemy.mesh.position);
+                         this.playExplosionSound();
                         // Pontuação por tiro acertado
                         this.enemyManager.score += 50;
                         this.enemyManager.updateScoreDisplay();
                         // Dano no inimigo
                         enemy.health -= 25;
                         if (enemy.health <= 0) {
+                           
                             this.scene.remove(enemy.mesh);
                             this.enemyManager.enemies.splice(j, 1);
                             this.enemyManager.score += 100;
@@ -949,14 +960,12 @@ class LandingSimulator {
                     console.log('Jogador atingido por tanque!');
                     this.playerHealth -= 15; // Dano maior que os aviões
                     this.updateHealthBar();
-                    
                     // Remover bala
                     this.scene.remove(bullet);
                     this.tankManager.tankBullets.splice(i, 1);
-                    
                     // Criar explosão
                     this.tankManager.createExplosion(this.airplane.position);
-                    
+                    this.playExplosionSound();
                     if (this.playerHealth <= 0) {
                         this.playerHealth = 0;
                         this.updateHealthBar();
@@ -977,13 +986,12 @@ class LandingSimulator {
                     const distance = bullet.position.distanceTo(tank.mesh.position);
                     if (distance < 1.5) { // Raio de colisão maior para tanques
                         console.log('Tanque atingido!');
-                        
                         // Remover bala
                         this.scene.remove(bullet);
                         this.enemyManager.bullets.splice(i, 1);
-                        
                         // Criar explosão
                         this.tankManager.createExplosion(tank.mesh.position);
+                        this.playExplosionSound();
                         // Pontuação por tiro acertado
                         this.enemyManager.score += 50;
                         this.enemyManager.updateScoreDisplay();
@@ -1124,7 +1132,7 @@ class LandingSimulator {
                     this.airplane.rotation.z = 0;
                 } else {
                     // Lógica de colisão violenta fora da pista
-                    if (this.planeState.speed > 2 && this.enemyManager.gameState !== 'landing') {
+                    if (this.planeState.speed > 3 && this.enemyManager.gameState !== 'landing') {
                         const damage = this.planeState.speed * 10;
                         this.playerHealth -= damage;
                         this.updateHealthBar();
