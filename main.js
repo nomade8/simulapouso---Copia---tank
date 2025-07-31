@@ -519,9 +519,9 @@ class LandingSimulator {
             metalness: 0
         });
         const wings = new THREE.Mesh(wingGeometry, wingMaterial);
-        wings.position.set(0, 0.1, 0);
+        wings.position.set(0, 0.01, 0);
         wings.rotation.set(0, 0, 0, 'XYZ');
-        wings.scale.set(3.28678, 0.081655, 0.9);
+        wings.scale.set(3.28678, 0.081655, 0.8);
         wings.castShadow = true;
         wings.receiveShadow = false;
         this.airplane.add(wings);
