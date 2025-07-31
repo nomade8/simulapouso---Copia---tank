@@ -511,19 +511,23 @@ class LandingSimulator {
         fuselage.rotation.x = Math.PI / 2;
         this.airplane.add(fuselage);
 
-        // Asas
-        const wingGeometry = new THREE.BoxGeometry(6, 0.2, 1.5);
-        const wingMaterial = new THREE.MeshPhongMaterial({
+        // Asas (cilindro estilizado)
+        const wingGeometry = new THREE.CylinderGeometry(1, 1, 1.5, 32);
+        const wingMaterial = new THREE.MeshStandardMaterial({
             color: '#fcfcfc',
-            flatShading: true
+            roughness: 1,
+            metalness: 0
         });
         const wings = new THREE.Mesh(wingGeometry, wingMaterial);
-        wings.castShadow = true;  // Enable shadow casting
-        wings.position.y = 0;
+        wings.position.set(0, 0.1, 0);
+        wings.rotation.set(0, 0, 0, 'XYZ');
+        wings.scale.set(3.28678, 0.081655, 0.9);
+        wings.castShadow = true;
+        wings.receiveShadow = false;
         this.airplane.add(wings);
 
         // Leme (Tail Fin)
-        const tailFinGeometry = new THREE.BoxGeometry(0.2, 1.5, 1);
+        const tailFinGeometry = new THREE.BoxGeometry(0.1, 1, 1);
         const tailFinMaterial = new THREE.MeshPhongMaterial({
             color: '#fcfcfc',
             flatShading: true
@@ -534,7 +538,7 @@ class LandingSimulator {
         this.airplane.add(tailFin);
 
         // Estabilizador Horizontal (Tail Plane)
-        const tailPlaneGeometry = new THREE.BoxGeometry(2, 0.15, 0.8);
+        const tailPlaneGeometry = new THREE.BoxGeometry(2.3, 0.1, 0.8);
         const tailPlane = new THREE.Mesh(tailPlaneGeometry, wingMaterial);
         tailPlane.castShadow = true;  // Enable shadow casting
         tailPlane.position.set(0, 0, -1.6);
