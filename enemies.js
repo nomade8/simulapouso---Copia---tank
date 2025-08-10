@@ -345,7 +345,7 @@ class EnemyManager {
         particleGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
         const particleMaterial = new THREE.PointsMaterial({
-            size: 0.2,
+            size: 0.1,
             vertexColors: true,
             transparent: true,
             opacity: 1,

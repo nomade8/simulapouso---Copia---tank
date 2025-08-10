@@ -305,7 +305,7 @@ class TankManager {
         particleGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
         const particleMaterial = new THREE.PointsMaterial({
-            size: 0.4,
+            size: 0.3,
             vertexColors: true,
             transparent: true,
             opacity: 1,
