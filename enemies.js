@@ -218,7 +218,7 @@ class EnemyManager {
             enemy.mesh.rotation.set(0, enemy._yaw, 0);
 
             // --- Roll acompanha a curva ---
-            const maxRoll = 0.6;
+            const maxRoll = 0.7;
             // O roll é proporcional à diferença de yaw (quanto mais curva, mais roll)
             let targetRoll = THREE.MathUtils.clamp(-deltaYaw * 2, -maxRoll, maxRoll);
             if (!enemy._roll) enemy._roll = 0;
@@ -258,7 +258,7 @@ class EnemyManager {
 
         const bulletGeometry = new THREE.SphereGeometry(0.08, 8, 8);
         const bulletMaterial = new THREE.MeshBasicMaterial({
-            color: isEnemy ? 0xff0000 : 'rgba(21, 47, 131, 1)'
+            color: isEnemy ? 0xff0000 : 'rgb(5, 247, 17)'
         });
         const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
         
