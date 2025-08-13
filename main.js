@@ -181,10 +181,66 @@ class LandingSimulator {
         groundGeometry.computeVertexNormals();
         groundGeometry.boundsTree = new MeshBVH(groundGeometry);
 
+        // Criar textura procedural realista para o terreno
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.createImageData(512, 512);
+        
+        // Função de ruído simples para criar variações naturais
+        function noise(x, y) {
+            const n = Math.sin(x * 0.01) * Math.cos(y * 0.01) + 
+                     Math.sin(x * 0.02) * Math.cos(y * 0.02) * 0.5 +
+                     Math.sin(x * 0.05) * Math.cos(y * 0.05) * 0.25;
+            return (n + 1) / 2; // Normalizar para 0-1
+        }
+        
+        // Gerar textura pixel por pixel
+        for (let x = 0; x < 512; x++) {
+            for (let y = 0; y < 512; y++) {
+                const index = (y * 512 + x) * 4;
+                
+                // Usar ruído para determinar a mistura entre verde e marrom
+                const noiseValue = noise(x, y);
+                const secondNoise = noise(x * 3.5, y * 1.5);
+                const thirdNoise = noise(x * 3, y * 3);
+                
+                // Combinar diferentes escalas de ruído
+                const finalNoise = (noiseValue * 0.6 + secondNoise * 0.3 + thirdNoise * 0.1);
+                
+                // Cores base
+                const greenR = 15, greenG = 90, greenB = 22;  // Verde escuro
+                const brownR = 35, brownG = 80, brownB = 13; // Marrom terra
+                
+                // Interpolar entre verde e marrom baseado no ruído
+                const r = Math.floor(greenR + (brownR - greenR) * finalNoise);
+                const g = Math.floor(greenG + (brownG - greenG) * finalNoise);
+                const b = Math.floor(greenB + (brownB - greenB) * finalNoise);
+                
+                // Adicionar pequenas variações aleatórias para textura
+                const variation = (Math.random() - 0.5) * 30;
+                
+                imageData.data[index] = Math.max(0, Math.min(255, r + variation));     // R
+                imageData.data[index + 1] = Math.max(0, Math.min(255, g + variation)); // G
+                imageData.data[index + 2] = Math.max(0, Math.min(255, b + variation)); // B
+                imageData.data[index + 3] = 255; // A
+            }
+        }
+        
+        ctx.putImageData(imageData, 0, 0);
+        
+        // Criar textura do Three.js
+        const terrainTexture = new THREE.CanvasTexture(canvas);
+        terrainTexture.wrapS = THREE.RepeatWrapping;
+        terrainTexture.wrapT = THREE.RepeatWrapping;
+        terrainTexture.repeat.set(6, 6); // Repetir a textura
+
         const groundMaterial = new THREE.MeshStandardMaterial({ 
-            color: '#0b9e32',
-            roughness: 0.8,
-            metalness: 0.1,
+            map: terrainTexture,
+            color: '#ffffff',
+            roughness: 0.9,
+            metalness: 0.0,
             flatShading: false
         });
 
@@ -611,7 +667,7 @@ class LandingSimulator {
 
     createClouds() {
         const cloudMaterial = new THREE.MeshLambertMaterial({
-            color: '#eeb0ff',
+            color: '#fcfcfc',
             transparent: true,
             opacity: 0.3,
             flatShading: true
