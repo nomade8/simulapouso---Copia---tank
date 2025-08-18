@@ -632,23 +632,39 @@ class EnemyManager {
         normalWorld.normalize();
 
         // Calcula duas opções de desvio lateral (esquerda e direita)
-        const rightDirection = new THREE.Vector3().crossVectors(normalWorld, new THREE.Vector3(0, 1, 0)).normalize();
-        const leftDirection = rightDirection.clone().multiplyScalar(-1);
+        const right = new THREE.Vector3().crossVectors(normalWorld, new THREE.Vector3(0, 1, 0)).normalize();
+        const left = right.clone().multiplyScalar(-1);
+
+        const wingspan = enemy.wingspan || 3;
+        const lateralCheckDist = Math.max(2.5, wingspan * 0.8);
+        const rightBlocked = this.raycastMountains(enemy.mesh.position, right, lateralCheckDist);
+        const leftBlocked  = this.raycastMountains(enemy.mesh.position, left,  lateralCheckDist);
+
+        const frontClose = this.raycastMountainsWithWingspan(enemy, enemy.moveDirection, Math.max(2, lateralCheckDist * 0.6));
+        if (frontClose && rightBlocked && leftBlocked) {
+            // Sem espaço realista: acelera explosão por travamento
+            enemy._blockedFrames = (enemy._blockedFrames || 0) + 3;
+            if (enemy._blockedFrames >= 12) {
+                this.createExplosion(enemy.mesh.position.clone());
+                this.scene.remove(enemy.mesh);
+                enemy._explodeNow = true;
+            }
+            return;
+        }
 
         // Escolhe a direção que mais se alinha com o movimento atual
         const currentDir = enemy.moveDirection.clone();
-        currentDir.y = 0;
-        currentDir.normalize();
+        currentDir.y = 0; currentDir.normalize();
 
-        const rightDot = rightDirection.dot(currentDir);
-        const leftDot = leftDirection.dot(currentDir);
-        const preferredDirection = rightDot > leftDot ? rightDirection : leftDirection;
+        const rightDot = right.dot(currentDir);
+        const leftDot = left.dot(currentDir);
+        const preferred = rightBlocked && !leftBlocked ? left
+                     : leftBlocked && !rightBlocked ? right
+                     : (rightDot > leftDot ? right : left);
 
-        // Mistura com a direção atual para desvio suave
-        const steerDir = currentDir.clone().lerp(preferredDirection, 0.5).normalize(); // Aumenta intensidade do desvio
-        steerDir.y = THREE.MathUtils.clamp(steerDir.y, -0.1, 0.1);
-
-        enemy.moveDirection.lerp(steerDir, 0.3).normalize(); // Aumenta velocidade de resposta
+        const steerDir = currentDir.clone().lerp(preferred, 0.45).normalize();
+        steerDir.y = THREE.MathUtils.clamp(enemy.moveDirection.y, -0.1, 0.1);
+        enemy.moveDirection.lerp(steerDir, 0.18).normalize();
     }
 
     // Função melhorada para detectar colisões considerando a largura das asas
@@ -695,8 +711,23 @@ class EnemyManager {
 
         const pos = enemy.mesh.position;
         const dir = stepVec.clone().normalize();
-        const hit = this.raycastMountainsWithWingspan(enemy, dir, stepVec.length() + this.collisionSkin);
+        const hit = this.raycastMountainsWithWingspan(
+            enemy,
+            dir,
+            stepVec.length() + this.collisionSkin
+        );
         if (!hit) return false;
+
+        // Explosão imediata se impacto iminente (muito perto)
+        const wingspan = enemy.wingspan || 3;
+        const minImpact = Math.max(1.2, wingspan * 0.35);
+        const impactDist = pos.distanceTo(hit.point);
+        if (impactDist <= minImpact) {
+            this.createExplosion(pos.clone());
+            this.scene.remove(enemy.mesh);
+            enemy._explodeNow = true;
+            return true;
+        }
 
         let normalWorld = null;
         if (hit.face && hit.object && hit.object.matrixWorld) {
@@ -788,23 +819,88 @@ class EnemyManager {
         normalWorld.normalize();
 
         // Calcula duas opções de desvio lateral (esquerda e direita)
-        const rightDirection = new THREE.Vector3().crossVectors(normalWorld, new THREE.Vector3(0, 1, 0)).normalize();
-        const leftDirection = rightDirection.clone().multiplyScalar(-1);
+        const right = new THREE.Vector3().crossVectors(normalWorld, new THREE.Vector3(0, 1, 0)).normalize();
+        const left = right.clone().multiplyScalar(-1);
+
+        const wingspan = enemy.wingspan || 3;
+        const lateralCheckDist = Math.max(2.5, wingspan * 0.8);
+        const rightBlocked = this.raycastMountains(enemy.mesh.position, right, lateralCheckDist);
+        const leftBlocked  = this.raycastMountains(enemy.mesh.position, left,  lateralCheckDist);
+
+        const frontClose = this.raycastMountainsWithWingspan(enemy, enemy.moveDirection, Math.max(2, lateralCheckDist * 0.6));
+        if (frontClose && rightBlocked && leftBlocked) {
+            // Sem espaço realista: acelera explosão por travamento
+            enemy._blockedFrames = (enemy._blockedFrames || 0) + 3;
+            if (enemy._blockedFrames >= 12) {
+                this.createExplosion(enemy.mesh.position.clone());
+                this.scene.remove(enemy.mesh);
+                enemy._explodeNow = true;
+            }
+            return;
+        }
 
         // Escolhe a direção que mais se alinha com o movimento atual
         const currentDir = enemy.moveDirection.clone();
-        currentDir.y = 0;
-        currentDir.normalize();
+        currentDir.y = 0; currentDir.normalize();
 
-        const rightDot = rightDirection.dot(currentDir);
-        const leftDot = leftDirection.dot(currentDir);
-        const preferredDirection = rightDot > leftDot ? rightDirection : leftDirection;
+        const rightDot = right.dot(currentDir);
+        const leftDot = left.dot(currentDir);
+        const preferred = rightBlocked && !leftBlocked ? left
+                     : leftBlocked && !rightBlocked ? right
+                     : (rightDot > leftDot ? right : left);
 
-        // Mistura com a direção atual para desvio suave
-        const steerDir = currentDir.clone().lerp(preferredDirection, 0.5).normalize(); // Aumenta intensidade do desvio
-        steerDir.y = THREE.MathUtils.clamp(steerDir.y, -0.1, 0.1);
+        const steerDir = currentDir.clone().lerp(preferred, 0.45).normalize();
+        steerDir.y = THREE.MathUtils.clamp(enemy.moveDirection.y, -0.1, 0.1);
+        enemy.moveDirection.lerp(steerDir, 0.18).normalize();
+    }
 
-        enemy.moveDirection.lerp(steerDir, 0.3).normalize(); // Aumenta velocidade de resposta
+    checkAndHandleStuckEnemy(enemy, index) {
+        if (!enemy || !enemy.mesh) return false;
+
+        // Distância crítica baseada na envergadura (fallback padrão)
+        const wingspan = enemy.wingspan || 3;
+        const criticalDist = Math.max(1.2, wingspan * 0.35);
+
+        // Raycast curtíssimo à frente (com asas) e um pouco para trás
+        const hitCloseFront = this.raycastMountainsWithWingspan(
+            enemy,
+            enemy.moveDirection,
+            criticalDist
+        );
+        const hitCloseBack = this.raycastMountains(
+            enemy.mesh.position,
+            enemy.moveDirection.clone().multiplyScalar(-1),
+            criticalDist * 0.6
+        );
+
+        if (hitCloseFront || hitCloseBack) {
+            // Já está encostado: explode imediatamente
+            this.createExplosion(enemy.mesh.position.clone());
+            this.scene.remove(enemy.mesh);
+            this.enemies.splice(index, 1);
+            return true;
+        }
+
+        // Detecção de “movimento mínimo” (travado)
+        const lastPos = enemy._lastPos ? enemy._lastPos.clone() : enemy.mesh.position.clone();
+        const moved = enemy.mesh.position.distanceTo(lastPos);
+        enemy._lastPos = enemy.mesh.position.clone();
+
+        if (moved < 0.03) {
+            enemy._stuckFrames = (enemy._stuckFrames || 0) + 1;
+        } else {
+            enemy._stuckFrames = 0;
+        }
+
+        // Se está próximo (mesmo que não detecte hit nesse frame) e não se move, explode
+        if ((hitCloseFront || hitCloseBack) && enemy._stuckFrames >= 8) {
+            this.createExplosion(enemy.mesh.position.clone());
+            this.scene.remove(enemy.mesh);
+            this.enemies.splice(index, 1);
+            return true;
+        }
+
+        return false;
     }
 }
 
