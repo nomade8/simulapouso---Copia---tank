@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 
 class TankManager {
-    constructor(scene, ground) {
+    constructor(scene, ground, mountainsGroup = null) {
         this.scene = scene;
         this.ground = ground; // Referência ao terreno para posicionamento
+        this.mountainsGroup = mountainsGroup; // Grupo de montanhas para colisão
         this.tanks = [];
         this.bullets = [];
         this.tankBullets = [];
@@ -16,6 +17,10 @@ class TankManager {
         this.particles = [];
         this.tanksPerPhase = 8; // 10 tanques por fase
         this.shootRange = 30; // Alcance de tiro
+
+        // Raycaster para checar montanhas
+        this.raycaster = new THREE.Raycaster();
+        this.raycaster.firstHitOnly = true;
     }
 
     createTank(playerPosition, spawnAttempt = 0) {
@@ -163,6 +168,15 @@ class TankManager {
         return tank;
     }
 
+    // Raycast contra as montanhas
+    raycastMountains(origin, direction, distance) {
+        if (!this.mountainsGroup) return null;
+        this.raycaster.set(origin, direction.clone().normalize());
+        this.raycaster.far = distance;
+        const hits = this.raycaster.intersectObject(this.mountainsGroup, true);
+        return hits && hits.length ? hits[0] : null;
+    }
+
     updateTanks(playerPosition) {
         const now = Date.now();
         const tankForward = new THREE.Vector3();
@@ -203,6 +217,22 @@ class TankManager {
             if (Math.abs(pos.z) > this.boundarySize) {
                 tank.moveDirection.z *= -1;
                 pos.z = Math.sign(pos.z) * this.boundarySize;
+            }
+
+            // Verificar montanha à frente e inverter direção se houver colisão
+            if (this.mountainsGroup) {
+                const lookAhead = 1.5; // distância de antevisão para detecção
+                const origin = tank.mesh.position.clone();
+                const dir = tank.moveDirection.clone().normalize();
+                const hit = this.raycastMountains(origin, dir, lookAhead);
+                if (hit) {
+                    // Inverte o sentido (apenas X e Z) conforme solicitado
+                    tank.moveDirection.x *= -1;
+                    tank.moveDirection.z *= -1;
+                    tank.moveDirection.y = 0;
+                    tank.moveDirection.normalize();
+                    tank.lastDirectionChange = now;
+                }
             }
 
             // Aplicar movimento

@@ -2,8 +2,9 @@ import * as THREE from 'three';
 
 
 class EnemyManager {
-    constructor(scene) {
+    constructor(scene, mountainsGroup = null) {
         this.scene = scene;
+        this.mountainsGroup = mountainsGroup;
         this.enemies = [];
         this.bullets = [];
         this.enemyBullets = [];
@@ -30,6 +31,15 @@ class EnemyManager {
         document.body.appendChild(this.scoreElement);
         this.updateScoreDisplay();
         this.shootRange = 20; // Adicionando range de tiro
+
+        // Parâmetros de colisão/evitação (ajustes finos)
+        this.collisionSkin = 0.6;              // distância mínima para ficar “fora” da superfície
+        this.maxCorrectionPerFrame = 0.3;      // limite de correção de posição por frame
+        this.avoidPersistMs = 250;             // “memória” de desvio após detectar montanha
+
+        // Raycaster com BVH
+        this.raycaster = new THREE.Raycaster();
+        this.raycaster.firstHitOnly = true;
     }
 
     updateScoreDisplay() {
@@ -149,7 +159,6 @@ class EnemyManager {
         const directionToPlayer = new THREE.Vector3();
 
         
-
         this.enemies.forEach(enemy => {
             // --- Lógica de Movimento ---
             if (now - enemy.lastDirectionChange > this.changeDirectionInterval) {
@@ -167,25 +176,71 @@ class EnemyManager {
                 const newDir = targetDirection.multiplyScalar(0.7).add(randomDirection.multiplyScalar(0.3)).normalize();
 
                 // Suaviza a mudança de direção
-                enemy.moveDirection.lerp(newDir, 0.4).normalize(); // Aumentar lerp para seguir mais rápido
+                enemy.moveDirection.lerp(newDir, 0.3).normalize(); // Aumentar lerp para seguir mais rápido
                 enemy.lastDirectionChange = now;
                 
                
             }
 
-            // Boundary check and movement (mantido)
+            // Verificações de limites X e Z + alinhamento imediato do yaw
+            // Verificações de limites X e Z com curva suave
             const pos = enemy.mesh.position;
             const minHeight = 5; // Altura mínima de voo
             const maxHeight = this.boundarySize / 3; // Altura máxima de voo
 
-            // Verificações de limites X e Z
+            // Detecta se está próximo da borda
+            const borderProximity = 2; // Distância da borda para começar a curva
+            const nearBorderX = Math.abs(pos.x) > (this.boundarySize - borderProximity);
+            const nearBorderZ = Math.abs(pos.z) > (this.boundarySize - borderProximity);
+            
+            // Inicia curva suave se estiver próximo da borda
+            if (nearBorderX || nearBorderZ) {
+                // Calcula direção para o centro
+                const centerDir = new THREE.Vector3(-pos.x, 0, -pos.z).normalize();
+                
+                // Quanto mais próximo da borda, mais forte a influência da direção ao centro
+                const distFromBorderX = this.boundarySize - Math.abs(pos.x);
+                const distFromBorderZ = this.boundarySize - Math.abs(pos.z);
+                const minDist = Math.min(distFromBorderX, distFromBorderZ);
+                const turnFactor = 1 - Math.min(minDist / borderProximity, 1);
+                
+                // Interpola suavemente entre a direção atual e a direção ao centro
+                const turnSpeed = 0.5 + (turnFactor * 0.1); // Aumenta velocidade de curva perto da borda
+                enemy.moveDirection.lerp(centerDir, turnSpeed).normalize();
+            }
+            
+            // Ainda mantém limites rígidos para garantir que não saia da área
+            if (Math.abs(pos.x) > this.boundarySize) {
+                pos.x = Math.sign(pos.x) * this.boundarySize;
+            }
+            if (Math.abs(pos.z) > this.boundarySize) {
+                pos.z = Math.sign(pos.z) * this.boundarySize;
+            }
+
+            let bounced = false;
             if (Math.abs(pos.x) > this.boundarySize) {
                 enemy.moveDirection.x *= -1;
                 pos.x = Math.sign(pos.x) * this.boundarySize;
+                bounced = true;
             }
             if (Math.abs(pos.z) > this.boundarySize) {
                 enemy.moveDirection.z *= -1;
                 pos.z = Math.sign(pos.z) * this.boundarySize;
+                bounced = true;
+            }
+
+            if (bounced) {
+                // Normaliza direção e alinha yaw imediatamente para não “andar de ré”
+                enemy.moveDirection.y = 0;
+                enemy.moveDirection.normalize();
+                const dirXZ = enemy.moveDirection.clone();
+                dirXZ.y = 0;
+                if (dirXZ.lengthSq() > 1e-6) {
+                    const snapYaw = Math.atan2(dirXZ.x, dirXZ.z);
+                    enemy._yaw = snapYaw;     // Alinha o yaw interno
+                    enemy._roll = 0;          // Zera roll para evitar torção após a batida
+                }
+                enemy.lastDirectionChange = now; // opcional: reinicia timer de direção
             }
 
             // Controle de altura
@@ -197,8 +252,15 @@ class EnemyManager {
                 pos.y = maxHeight;
             }
 
-            // Aplicar movimento
-            enemy.mesh.position.add(enemy.moveDirection.clone().multiplyScalar(enemy.speed));
+            // Evitar montanhas à frente de forma antecipada (suave)
+            this.steerIfMountainAhead(enemy);
+
+            // Aplicar movimento com checagem de colisão contra montanhas (suave)
+            const stepVec = enemy.moveDirection.clone().multiplyScalar(enemy.speed);
+            const collided = this.resolveMountainCollision(enemy, stepVec);
+            if (!collided) {
+                enemy.mesh.position.add(stepVec);
+            }
 
             // --- Rotação suave e curva realista ---
             const moveXZ = enemy.moveDirection.clone();
@@ -213,14 +275,20 @@ class EnemyManager {
             let deltaYaw = targetYaw - enemy._yaw;
             if (deltaYaw > Math.PI) deltaYaw -= 2 * Math.PI;
             if (deltaYaw < -Math.PI) deltaYaw += 2 * Math.PI;
-            enemy._yaw += deltaYaw * 0.08; // Fator de suavidade
-            // Aplica rotação: Yaw interpolado, Pitch 0, Roll visual
-            enemy.mesh.rotation.set(0, enemy._yaw, 0);
+            // Limita a mudança máxima de yaw para evitar giros rápidos
+            const maxYawChange = 0.05; // Ajuste conforme necessário
+            deltaYaw = THREE.MathUtils.clamp(deltaYaw, -maxYawChange, maxYawChange);
+            enemy._yaw += deltaYaw;
+            // Normaliza yaw para manter entre -PI e PI
+            enemy._yaw = (enemy._yaw + Math.PI) % (2 * Math.PI) - Math.PI;
+            // Calcula e aplica roll baseado na taxa de mudança de yaw (inclinação em curvas)
+            const roll = -deltaYaw * 2; // Ajuste o multiplicador para intensidade do roll
+            enemy.mesh.rotation.set(0, enemy._yaw, roll);
 
             // --- Roll acompanha a curva ---
             const maxRoll = 0.7;
             // O roll é proporcional à diferença de yaw (quanto mais curva, mais roll)
-            let targetRoll = THREE.MathUtils.clamp(-deltaYaw * 2, -maxRoll, maxRoll);
+            let targetRoll = THREE.MathUtils.clamp(-deltaYaw * 20, -maxRoll, maxRoll);
             if (!enemy._roll) enemy._roll = 0;
             enemy._roll = THREE.MathUtils.lerp(enemy._roll, targetRoll, 0.08);
             enemy.mesh.rotation.z = enemy._roll;
@@ -250,6 +318,14 @@ class EnemyManager {
             }
         });
         this.updateParticles();
+
+        // --- NOVO: remover inimigos que explodiram por colisão com montanha ---
+        this.enemies = this.enemies.filter(e => {
+            if (e._explodeNow) {
+                return false;
+            }
+            return true;
+        });
     }
 
     shoot(position, direction, isEnemy = false) {
@@ -258,7 +334,7 @@ class EnemyManager {
 
         const bulletGeometry = new THREE.SphereGeometry(0.08, 8, 8);
         const bulletMaterial = new THREE.MeshBasicMaterial({
-            color: isEnemy ? 0xff0000 : 'rgb(5, 247, 17)'
+            color: isEnemy ? 0xff0000 : 'rgb(250, 9, 9)'
         });
         const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
         
@@ -329,7 +405,12 @@ class EnemyManager {
     }
 
     createExplosion(position) {
-        const particleCount = 100;
+        // Adiciona o som da explosão
+        const explosionSound = new Audio('explosion.mp3');
+        explosionSound.volume = 0.05; // Ajuste o volume conforme necessário
+        explosionSound.play();
+
+        const particleCount = 150;
         const particleGeometry = new THREE.BufferGeometry();
         const positions = [];
         const colors = [];
@@ -441,6 +522,289 @@ class EnemyManager {
         this.phase = 1;
         this.gameState = 'combat';
         this.updateScoreDisplay();
+    }
+
+    // Raycast contra o grupo de montanhas utilizando BVH
+    raycastMountains(origin, direction, distance) {
+        if (!this.mountainsGroup) return null;
+        this.raycaster.set(origin, direction.clone().normalize());
+        this.raycaster.far = distance;
+        const hits = this.raycaster.intersectObject(this.mountainsGroup, true);
+        return hits && hits.length ? hits[0] : null;
+    }
+
+    // Ajusta direção/posição para não atravessar a montanha (lateral apenas)
+    resolveMountainCollision(enemy, stepVec) {
+        if (!this.mountainsGroup) return false;
+
+        const pos = enemy.mesh.position;
+        const dir = stepVec.clone().normalize();
+        const hit = this.raycastMountains(enemy, dir, stepVec.length() + this.collisionSkin);
+        if (!hit) return false;
+
+        let normalWorld = null;
+        if (hit.face && hit.object && hit.object.matrixWorld) {
+            normalWorld = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+        } else {
+            normalWorld = pos.clone().sub(hit.point).normalize();
+        }
+
+        // Força a normal a ser mais horizontal para evitar subida irreal
+        normalWorld.y = 0;
+        normalWorld.normalize();
+
+        // Ponto seguro fora da superfície (apenas lateral)
+        const safePoint = hit.point.clone().add(normalWorld.clone().multiplyScalar(this.collisionSkin));
+        safePoint.y = pos.y;
+
+        // Vetor de correção limitado por quadro (apenas lateral)
+        const correction = safePoint.clone().sub(pos);
+        correction.y = 0;
+        const maxCorr = this.maxCorrectionPerFrame;
+        if (correction.length() > maxCorr) correction.setLength(maxCorr);
+
+        // Aplica correção lateral suavemente
+        pos.add(correction);
+
+        // Deslize lateral ao longo da superfície
+        const lateralDirection = stepVec.clone();
+        lateralDirection.y = 0;
+        const slide = lateralDirection.projectOnPlane(normalWorld);
+        const newDir = slide.lengthSq() > 1e-6 ? slide.normalize() : lateralDirection.clone().reflect(normalWorld).normalize();
+
+        // Garante que a nova direção seja majoritariamente horizontal
+        newDir.y = THREE.MathUtils.clamp(newDir.y, -0.1, 0.1);
+        newDir.normalize();
+        enemy.moveDirection.lerp(newDir, 0.3).normalize();
+
+        // Memoriza a normal lateral para manter o desvio
+        enemy._avoidNormal = normalWorld.clone();
+        enemy._avoidUntil = Date.now() + this.avoidPersistMs;
+
+        // --- NOVO: detecção de travamento e explosão ---
+        const slideLen = slide.length();
+        // Se praticamente não há escape lateral, conta frames travados
+        if (slideLen < 0.02) {
+            enemy._blockedFrames = (enemy._blockedFrames || 0) + 1;
+        } else {
+            enemy._blockedFrames = 0;
+        }
+
+        // Se ficou travado por ~0.6s (36 frames a ~60fps), explode
+        if (enemy._blockedFrames >= 36) {
+            this.createExplosion(pos.clone());
+            this.scene.remove(enemy.mesh);
+            enemy._explodeNow = true;
+        }
+
+        return true;
+    }
+
+    // Antecipação lateral com look-ahead suavizado
+    steerIfMountainAhead(enemy) {
+        if (!this.mountainsGroup) return;
+
+        const now = Date.now();
+
+        // Se ainda estamos no período de desvio, continue com desvio lateral
+        if (enemy._avoidNormal && enemy._avoidUntil && now < enemy._avoidUntil) {
+            const lateralDir = enemy.moveDirection.clone();
+            lateralDir.y = THREE.MathUtils.clamp(lateralDir.y, -0.1, 0.1);
+            const persistedDir = lateralDir.projectOnPlane(enemy._avoidNormal).normalize();
+            persistedDir.y = THREE.MathUtils.clamp(persistedDir.y, -0.1, 0.1);
+            enemy.moveDirection.lerp(persistedDir, 0.2).normalize();
+            return;
+        }
+
+        const lookAhead = Math.max(15, enemy.speed * 20); // Aumenta ainda mais a distância de detecção
+        const hitAhead = this.raycastMountainsWithWingspan(enemy, enemy.moveDirection, lookAhead);
+        if (!hitAhead) return;
+
+        let normalWorld = null;
+        if (hitAhead.face && hitAhead.object && hitAhead.object.matrixWorld) {
+            normalWorld = hitAhead.face.normal.clone().transformDirection(hitAhead.object.matrixWorld).normalize();
+        } else {
+            normalWorld = enemy.mesh.position.clone().sub(hitAhead.point).normalize();
+        }
+
+        // Força desvio lateral: remove componente vertical da normal
+        normalWorld.y = 0;
+        normalWorld.normalize();
+
+        // Calcula duas opções de desvio lateral (esquerda e direita)
+        const rightDirection = new THREE.Vector3().crossVectors(normalWorld, new THREE.Vector3(0, 1, 0)).normalize();
+        const leftDirection = rightDirection.clone().multiplyScalar(-1);
+
+        // Escolhe a direção que mais se alinha com o movimento atual
+        const currentDir = enemy.moveDirection.clone();
+        currentDir.y = 0;
+        currentDir.normalize();
+
+        const rightDot = rightDirection.dot(currentDir);
+        const leftDot = leftDirection.dot(currentDir);
+        const preferredDirection = rightDot > leftDot ? rightDirection : leftDirection;
+
+        // Mistura com a direção atual para desvio suave
+        const steerDir = currentDir.clone().lerp(preferredDirection, 0.5).normalize(); // Aumenta intensidade do desvio
+        steerDir.y = THREE.MathUtils.clamp(steerDir.y, -0.1, 0.1);
+
+        enemy.moveDirection.lerp(steerDir, 0.3).normalize(); // Aumenta velocidade de resposta
+    }
+
+    // Função melhorada para detectar colisões considerando a largura das asas
+    raycastMountainsWithWingspan(enemy, direction, distance) {
+        if (!this.mountainsGroup) return null;
+        
+        const pos = enemy.mesh.position;
+        const wingSpan = 4; // Largura das asas do avião
+        
+        // Calcula direção perpendicular para as asas (esquerda e direita)
+        const rightVector = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 1, 0)).normalize();
+        
+        // Pontos de teste: centro, asa esquerda e asa direita
+        const testPoints = [
+            pos.clone(), // Centro
+            pos.clone().add(rightVector.clone().multiplyScalar(wingSpan / 2)), // Asa direita
+            pos.clone().add(rightVector.clone().multiplyScalar(-wingSpan / 2)) // Asa esquerda
+        ];
+        
+        let closestHit = null;
+        let minDistance = Infinity;
+        
+        // Testa colisão em todos os pontos
+        for (const testPoint of testPoints) {
+            this.raycaster.set(testPoint, direction.clone().normalize());
+            this.raycaster.far = distance;
+            const hits = this.raycaster.intersectObject(this.mountainsGroup, true);
+            
+            if (hits && hits.length > 0) {
+                const hit = hits[0];
+                if (hit.distance < minDistance) {
+                    minDistance = hit.distance;
+                    closestHit = hit;
+                }
+            }
+        }
+        
+        return closestHit;
+    }
+
+    // Atualiza resolveMountainCollision para usar a nova detecção
+    resolveMountainCollision(enemy, stepVec) {
+        if (!this.mountainsGroup) return false;
+
+        const pos = enemy.mesh.position;
+        const dir = stepVec.clone().normalize();
+        const hit = this.raycastMountainsWithWingspan(enemy, dir, stepVec.length() + this.collisionSkin);
+        if (!hit) return false;
+
+        let normalWorld = null;
+        if (hit.face && hit.object && hit.object.matrixWorld) {
+            normalWorld = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+        } else {
+            normalWorld = pos.clone().sub(hit.point).normalize();
+        }
+
+        // Força a normal a ser mais horizontal para evitar subida irreal
+        normalWorld.y = 0;
+        normalWorld.normalize();
+
+        // Ponto seguro fora da superfície com margem maior para as asas
+        const safetyMargin = this.collisionSkin + 2; // Margem extra para as asas
+        const safePoint = hit.point.clone().add(normalWorld.clone().multiplyScalar(safetyMargin));
+        safePoint.y = pos.y;
+
+        // Vetor de correção limitado por quadro (apenas lateral)
+        const correction = safePoint.clone().sub(pos);
+        correction.y = 0;
+        const maxCorr = this.maxCorrectionPerFrame;
+        if (correction.length() > maxCorr) correction.setLength(maxCorr);
+
+        // Aplica correção lateral suavemente
+        pos.add(correction);
+
+        // Deslize lateral ao longo da superfície
+        const lateralDirection = stepVec.clone();
+        lateralDirection.y = 0;
+        const slide = lateralDirection.projectOnPlane(normalWorld);
+        const newDir = slide.lengthSq() > 1e-6 ? slide.normalize() : lateralDirection.clone().reflect(normalWorld).normalize();
+
+        // Garante que a nova direção seja majoritariamente horizontal
+        newDir.y = THREE.MathUtils.clamp(newDir.y, -0.1, 0.1);
+        newDir.normalize();
+        enemy.moveDirection.lerp(newDir, 0.3).normalize();
+
+        // Memoriza a normal lateral para manter o desvio
+        enemy._avoidNormal = normalWorld.clone();
+        enemy._avoidUntil = Date.now() + this.avoidPersistMs;
+
+        // Detecção de travamento e explosão
+        const slideLen = slide.length();
+        if (slideLen < 0.02) {
+            enemy._blockedFrames = (enemy._blockedFrames || 0) + 1;
+        } else {
+            enemy._blockedFrames = 0;
+        }
+
+        // Se ficou travado por ~0.6s (36 frames a ~60fps), explode
+        if (enemy._blockedFrames >= 36) {
+            this.createExplosion(pos.clone());
+            this.scene.remove(enemy.mesh);
+            enemy._explodeNow = true;
+        }
+
+        return true;
+    }
+
+    // Atualiza steerIfMountainAhead para usar a nova detecção
+    steerIfMountainAhead(enemy) {
+        if (!this.mountainsGroup) return;
+
+        const now = Date.now();
+
+        // Se ainda estamos no período de desvio, continue com desvio lateral
+        if (enemy._avoidNormal && enemy._avoidUntil && now < enemy._avoidUntil) {
+            const lateralDir = enemy.moveDirection.clone();
+            lateralDir.y = THREE.MathUtils.clamp(lateralDir.y, -0.1, 0.1);
+            const persistedDir = lateralDir.projectOnPlane(enemy._avoidNormal).normalize();
+            persistedDir.y = THREE.MathUtils.clamp(persistedDir.y, -0.1, 0.1);
+            enemy.moveDirection.lerp(persistedDir, 0.2).normalize();
+            return;
+        }
+
+        const lookAhead = Math.max(15, enemy.speed * 20); // Aumenta ainda mais a distância de detecção
+        const hitAhead = this.raycastMountainsWithWingspan(enemy, enemy.moveDirection, lookAhead);
+        if (!hitAhead) return;
+
+        let normalWorld = null;
+        if (hitAhead.face && hitAhead.object && hitAhead.object.matrixWorld) {
+            normalWorld = hitAhead.face.normal.clone().transformDirection(hitAhead.object.matrixWorld).normalize();
+        } else {
+            normalWorld = enemy.mesh.position.clone().sub(hitAhead.point).normalize();
+        }
+
+        // Força desvio lateral: remove componente vertical da normal
+        normalWorld.y = 0;
+        normalWorld.normalize();
+
+        // Calcula duas opções de desvio lateral (esquerda e direita)
+        const rightDirection = new THREE.Vector3().crossVectors(normalWorld, new THREE.Vector3(0, 1, 0)).normalize();
+        const leftDirection = rightDirection.clone().multiplyScalar(-1);
+
+        // Escolhe a direção que mais se alinha com o movimento atual
+        const currentDir = enemy.moveDirection.clone();
+        currentDir.y = 0;
+        currentDir.normalize();
+
+        const rightDot = rightDirection.dot(currentDir);
+        const leftDot = leftDirection.dot(currentDir);
+        const preferredDirection = rightDot > leftDot ? rightDirection : leftDirection;
+
+        // Mistura com a direção atual para desvio suave
+        const steerDir = currentDir.clone().lerp(preferredDirection, 0.5).normalize(); // Aumenta intensidade do desvio
+        steerDir.y = THREE.MathUtils.clamp(steerDir.y, -0.1, 0.1);
+
+        enemy.moveDirection.lerp(steerDir, 0.3).normalize(); // Aumenta velocidade de resposta
     }
 }
 

@@ -60,14 +60,14 @@ class LandingSimulator {
             this.cameraOffset = new THREE.Vector3(0, 1.0, -1); // Initialize cameraOffset here
 
             // Inicializar gerenciador de inimigos
-            this.enemyManager = new EnemyManager(this.scene);
+            this.enemyManager = new EnemyManager(this.scene, this.mountainsGroup);
             // Criar inimigos iniciais da primeira fase
             for (let i = 0; i < this.enemyManager.enemiesPerPhase; i++) {
                  this.enemyManager.createEnemy(this.airplane.position);
             }
             
             // Inicializar gerenciador de tanques
-            this.tankManager = new TankManager(this.scene, this.ground);
+            this.tankManager = new TankManager(this.scene, this.ground, this.mountainsGroup);
             // Criar tanques iniciais da primeira fase
             for (let i = 0; i < this.tankManager.tanksPerPhase; i++) {
                 this.tankManager.createTank(this.airplane.position);
@@ -1257,11 +1257,19 @@ class LandingSimulator {
 
         // Consumo de combustível
         if (this.planeState.fuel > 0 && this.planeState.speed > 0) {
-            this.planeState.fuel -= 0.05 * (this.planeState.speed / 100);
+            this.planeState.fuel -= 0.02 * (this.planeState.speed / 100);
             this.planeState.fuel = Math.max(this.planeState.fuel, 0);
         } else if (this.planeState.fuel <= 0) {
-            this.planeState.speed = Math.max(this.planeState.speed - 0.5, 0);
-            this.planeState.pitch = Math.max(this.planeState.pitch - 0.01, -0.3);
+            // Mantém a velocidade atual (não desacelera por falta de combustível)
+            // Aplica perda de altitude gradual (como gravidade sem motor)
+            const gravity = 0.05; // Ajuste para taxa de descida realista
+            this.planeState.pitch = Math.max(this.planeState.pitch - 0.005, -0.4); // Pitch down suave
+            // Aplica descida diretamente à posição para simular perda de sustentação
+            if (!this._onGroundOnRunway) {
+                this.airplane.position.y -= gravity;
+            }
+            // Impede controles de aceleração, mas permite manobras
+            this.planeState.speed = Math.max(this.planeState.speed, 0); // Não permite aceleração
         }
 
         this.airplane.rotation.order = 'YXZ';
