@@ -319,14 +319,14 @@ class TankManager {
     }
 
     createExplosion(position) {
-        const particleCount = 100;
+        const particleCount = 150;
         const particleGeometry = new THREE.BufferGeometry();
         const positions = [];
         const colors = [];
         const color = new THREE.Color();
 
         for (let i = 0; i < particleCount; i++) {
-            positions.push((Math.random() - 1) * 1, (Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 1);
+            positions.push((Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 1);
             color.setHSL(Math.random() * 0.1 + 0.05, 1, 0.5); // Tons de laranja/vermelho
             colors.push(color.r, color.g, color.b);
         }
@@ -335,7 +335,7 @@ class TankManager {
         particleGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
         const particleMaterial = new THREE.PointsMaterial({
-            size: 0.3,
+            size: 0.18,
             vertexColors: true,
             transparent: true,
             opacity: 1,
@@ -346,7 +346,7 @@ class TankManager {
         points.position.copy(position);
 
         this.scene.add(points);
-        this.particles.push({ mesh: points, life: 1.0, type: 'explosion' });
+        this.particles.push({ mesh: points, life: 1.2, type: 'explosion' });
     }
 
     updateParticles() {

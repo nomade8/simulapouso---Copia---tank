@@ -177,10 +177,10 @@ class EnemyManager {
                 ).normalize();
     
                 // Mistura a direção do jogador com a aleatória (70% jogador, 30% aleatório)
-                const newDir = targetDirection.multiplyScalar(0.7).add(randomDirection.multiplyScalar(0.3)).normalize();
+                const newDir = targetDirection.multiplyScalar(0.75).add(randomDirection.multiplyScalar(0.25)).normalize();
     
                 // Suaviza a mudança de direção
-                enemy.moveDirection.lerp(newDir, 0.3).normalize(); // Aumentar lerp para seguir mais rápido
+                enemy.moveDirection.lerp(newDir, 0.35).normalize(); // Aumentar lerp para seguir mais rápido
                 enemy.lastDirectionChange = now;
                 
                
@@ -474,10 +474,10 @@ class EnemyManager {
         particleGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
         const particleMaterial = new THREE.PointsMaterial({
-            size: 0.3,
+            size: 0.1,
             vertexColors: true,
             transparent: true,
-            opacity: 0.5,
+            opacity: 1,
             sizeAttenuation: true
         });
 
