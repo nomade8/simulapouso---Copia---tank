@@ -161,9 +161,44 @@ class EnemyManager {
         // Loop reverso para remoção segura
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const enemy = this.enemies[i];
-            
-            // REMOVA a chamada para checkAndHandleStuckEnemy
-            
+
+            // Queda parabólica levando em conta a velocidade no momento da morte
+            if (enemy.isDying && enemy.death) {
+                const now = Date.now();
+                const dt = enemy._deathLastTime ? (now - enemy._deathLastTime) / 1000 : 0.016;
+                enemy._deathLastTime = now;
+
+                // Integra posição: mantém velocidade horizontal, aplica gravidade em Y
+                if (!enemy.death.velocity) {
+                    enemy.death.velocity = new THREE.Vector3(0, -2.5, 0);
+                }
+                enemy.mesh.position.add(enemy.death.velocity.clone().multiplyScalar(dt));
+                enemy.death.velocity.y -= enemy.death.gravity * dt;
+
+                // Aponta nariz para baixo com leve giro
+                const targetPitch = -Math.PI / 2; // -90°
+                const currentPitch = enemy.mesh.rotation.x || 0;
+                enemy.mesh.rotation.x = THREE.MathUtils.lerp(currentPitch, targetPitch, 0.2);
+                enemy.mesh.rotation.y += enemy.death.yawSpin * dt;
+                enemy.mesh.rotation.z += enemy.death.rollSpin * dt;
+
+                // Detecta o chão (raycast) ou fallback por y
+                let groundY = 0;
+                const downHit = this.raycastMountains(enemy.mesh.position.clone(), new THREE.Vector3(0, -1, 0), 1000);
+                if (downHit && downHit.point) {
+                    groundY = downHit.point.y;
+                }
+                if (enemy.mesh.position.y <= groundY + 0.1) {
+                    this.createExplosion(enemy.mesh.position.clone());
+                    this.scene.remove(enemy.mesh);
+                    this.enemies.splice(i, 1);
+                    continue;
+                }
+
+                // Enquanto morrendo, não aplica mais lógica normal
+                continue;
+            }
+
             // --- Lógica de Movimento ---
             if (now - enemy.lastDirectionChange > this.changeDirectionInterval) {
                 // Vetor na direção do jogador
@@ -645,7 +680,7 @@ class EnemyManager {
             return;
         }
 
-        const lookAhead = Math.max(20, enemy.speed * 25); // Detecção mais antecipada
+        const lookAhead = Math.max(30, enemy.speed * 25); // Detecção mais antecipada
         const hitAhead = this.raycastMountainsWithWingspan(enemy, enemy.moveDirection, lookAhead);
         if (!hitAhead) return;
 
@@ -758,6 +793,37 @@ class EnemyManager {
         }
 
         return false;
+    }
+
+    // Inicia a queda em espiral lenta a partir da posição ATUAL do inimigo (sem movimento instantâneo)
+    startEnemyDeathSpiral(enemy) {
+        if (!enemy || !enemy.mesh) return;
+        enemy.isDying = true;
+
+        // Direção horizontal atual e velocidade do inimigo no momento da morte
+        const dirXZ = enemy.moveDirection.clone();
+        dirXZ.y = 0;
+        if (dirXZ.lengthSq() < 1e-6) dirXZ.set(1, 0, 0);
+        dirXZ.normalize();
+
+        // Converte a "speed" por frame para unidades/segundo (aprox. 60 fps)
+        const initialHorizontalSpeed = enemy.speed * 60;
+
+        // Define estado da queda: velocidade inicial horizontal e leve componente vertical para iniciar o mergulho
+        enemy.death = {
+            velocity: new THREE.Vector3(
+                dirXZ.x * initialHorizontalSpeed *1.5,
+                -2.5, // inicia descendo suavemente
+                dirXZ.z * initialHorizontalSpeed
+            ),
+            gravity: 10.5, // aceleração da gravidade (unidades/s^2)
+            yawSpin: 0.3,  // giro lento para dar vida à queda
+            rollSpin: -0.9 // leve rolamento
+        };
+
+        // Zera efeitos de rolagem interna para não conflitar
+        enemy._roll = 0;
+        enemy._deathLastTime = Date.now();
     }
 }
 

@@ -987,21 +987,24 @@ class LandingSimulator {
                         // Remover bala
                         this.scene.remove(bullet);
                         this.enemyManager.bullets.splice(i, 1);
-                        // Criar explosão
+                        // Criar explosão (acerto visual)
                         this.enemyManager.createExplosion(enemy.mesh.position);
-                         this.playExplosionSound();
+                        this.playShotgunSound?.();
+
                         // Pontuação por tiro acertado
                         this.enemyManager.score += 50;
                         this.enemyManager.updateScoreDisplay();
+
                         // Dano no inimigo
                         enemy.health -= 25;
-                        if (enemy.health <= 0) {
-                           
-                            this.scene.remove(enemy.mesh);
-                            this.enemyManager.enemies.splice(j, 1);
-                            this.enemyManager.score += 100;
-                            this.enemyManager.updateScoreDisplay();
-                        }
+
+                        // Quando a vida chega a 0, inicia a queda controlada (sem remover agora)
+                if (enemy.health <= 0 && !enemy.isDying) {
+                    this.enemyManager.startEnemyDeathSpiral(enemy);
+                    this.enemyManager.score += 100;
+                    this.enemyManager.updateScoreDisplay();
+                }
+
                         break; // Sair do loop interno após a colisão
                     }
                 }
