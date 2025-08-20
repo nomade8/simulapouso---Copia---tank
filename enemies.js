@@ -723,14 +723,6 @@ class EnemyManager {
             criticalDist * 0.6
         );
 
-        if (hitCloseFront || hitCloseBack) {
-            // Já está encostado: explode imediatamente
-            this.createExplosion(enemy.mesh.position.clone());
-            this.scene.remove(enemy.mesh);
-            this.enemies.splice(index, 1);
-            return true;
-        }
-
         // Detecção de “movimento mínimo” (travado)
         const lastPos = enemy._lastPos ? enemy._lastPos.clone() : enemy.mesh.position.clone();
         const moved = enemy.mesh.position.distanceTo(lastPos);
@@ -742,11 +734,26 @@ class EnemyManager {
             enemy._stuckFrames = 0;
         }
 
-        // Se está próximo (mesmo que não detecte hit nesse frame) e não se move, explode
+        // Se está travado e próximo de montanha, inverte direção em vez de explodir
         if ((hitCloseFront || hitCloseBack) && enemy._stuckFrames >= 8) {
-            this.createExplosion(enemy.mesh.position.clone());
-            this.scene.remove(enemy.mesh);
-            this.enemies.splice(index, 1);
+            // Inverte o sentido (apenas X e Z)
+            enemy.moveDirection.x *= -1;
+            enemy.moveDirection.z *= -1;
+            enemy.moveDirection.y = 0;
+            enemy.moveDirection.normalize();
+
+            // Atualiza yaw para alinhar com nova direção
+            const dirXZ = enemy.moveDirection.clone();
+            dirXZ.y = 0;
+            if (dirXZ.lengthSq() > 1e-6) {
+                enemy._yaw = Math.atan2(dirXZ.x, dirXZ.z);
+                enemy._roll = 0;
+            }
+
+            // Reseta contadores de stuck
+            enemy._stuckFrames = 0;
+            enemy.lastDirectionChange = Date.now();
+
             return true;
         }
 
