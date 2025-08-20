@@ -498,7 +498,7 @@ class EnemyManager {
         points.position.copy(position);
 
         this.scene.add(points);
-        this.particles.push({ mesh: points, life: 1.0, type: 'explosion' });
+        this.particles.push({ mesh: points, life: 0.6, type: 'explosion' });
     }
 
     createSmokeEffect(position) {
@@ -520,10 +520,10 @@ class EnemyManager {
         particleGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
         const particleMaterial = new THREE.PointsMaterial({
-            size: 0.13,
+            size: 0.12,
             vertexColors: true,
             transparent: true,
-            opacity: 0.1,
+            opacity: 1,
             sizeAttenuation: true
         });
 
