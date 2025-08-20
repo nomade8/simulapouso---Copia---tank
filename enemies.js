@@ -181,6 +181,16 @@ class EnemyManager {
                 enemy.mesh.rotation.x = THREE.MathUtils.lerp(currentPitch, targetPitch, 0.2);
                 enemy.mesh.rotation.y += enemy.death.yawSpin * dt;
                 enemy.mesh.rotation.z += enemy.death.rollSpin * dt;
+                
+                // Adiciona fumaça durante a queda (a cada 200ms aproximadamente)
+                if (!enemy._lastSmokeTime || now - enemy._lastSmokeTime > 100) {
+
+                    // Posição ligeiramente atrás do avião
+                    const smokePos = enemy.mesh.position.clone();
+                    smokePos.y -= 0.1; // Um pouco abaixo para parecer que sai da parte traseira
+                    this.createSmokeEffect(smokePos);
+                    enemy._lastSmokeTime = now;
+                }
 
                 // Detecta o chão (raycast) ou fallback por y
                 let groundY = 0;
@@ -480,7 +490,7 @@ class EnemyManager {
             size: 0.1,
             vertexColors: true,
             transparent: true,
-            opacity: 1,
+            opacity: 0.5,
             sizeAttenuation: true
         });
 
@@ -492,7 +502,7 @@ class EnemyManager {
     }
 
     createSmokeEffect(position) {
-        const particleCount = 20;
+        const particleCount = 40;
         const particleGeometry = new THREE.BufferGeometry();
         const positions = [];
         const colors = [];
@@ -501,7 +511,8 @@ class EnemyManager {
         for (let i = 0; i < particleCount; i++) {
             positions.push((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5);
             const gray = Math.random() * 0.3 + 0.3; // Tons de cinza
-            color.setRGB(gray, gray, gray);
+            color.setRGB(0.05, 0.05, 0.05);
+
             colors.push(color.r, color.g, color.b);
         }
 
@@ -509,10 +520,10 @@ class EnemyManager {
         particleGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
         const particleMaterial = new THREE.PointsMaterial({
-            size: 0.1,
+            size: 0.13,
             vertexColors: true,
             transparent: true,
-            opacity: 1,
+            opacity: 0.01,
             sizeAttenuation: true
         });
 
@@ -520,7 +531,7 @@ class EnemyManager {
         points.position.copy(position);
 
         this.scene.add(points);
-        this.particles.push({ mesh: points, life: 1.5, type: 'smoke' }); // Fumaça dura mais
+        this.particles.push({ mesh: points, life: 1.0, type: 'smoke' }); // Fumaça dura mais
     }
 
     updateParticles() {
@@ -532,7 +543,7 @@ class EnemyManager {
                 particle.mesh.material.opacity = particle.life;
                 particle.mesh.scale.multiplyScalar(1.05);
             } else if (particle.type === 'smoke') {
-                particle.mesh.material.opacity = particle.life * 0.5; // Fumaça mais sutil
+                particle.mesh.material.opacity = particle.life * 2; // Fumaça mais sutil
                 particle.mesh.position.y += 0.01; // Fumaça sobe
             }
 
@@ -812,13 +823,13 @@ class EnemyManager {
         // Define estado da queda: velocidade inicial horizontal e leve componente vertical para iniciar o mergulho
         enemy.death = {
             velocity: new THREE.Vector3(
-                dirXZ.x * initialHorizontalSpeed *1.5,
+                dirXZ.x * initialHorizontalSpeed *1.4,
                 -2.5, // inicia descendo suavemente
                 dirXZ.z * initialHorizontalSpeed
             ),
             gravity: 10.5, // aceleração da gravidade (unidades/s^2)
             yawSpin: 0.3,  // giro lento para dar vida à queda
-            rollSpin: -0.9 // leve rolamento
+            rollSpin: 2.5 // leve rolamento
         };
 
         // Zera efeitos de rolagem interna para não conflitar
