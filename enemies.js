@@ -183,7 +183,7 @@ class EnemyManager {
                 enemy.mesh.rotation.z += enemy.death.rollSpin * dt;
                 
                 // Adiciona fumaça durante a queda (a cada 200ms aproximadamente)
-                if (!enemy._lastSmokeTime || now - enemy._lastSmokeTime > 100) {
+                if (!enemy._lastSmokeTime || now - enemy._lastSmokeTime > 60) {
 
                     // Posição ligeiramente atrás do avião
                     const smokePos = enemy.mesh.position.clone();
@@ -478,7 +478,7 @@ class EnemyManager {
         const color = new THREE.Color();
 
         for (let i = 0; i < particleCount; i++) {
-            positions.push((Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2);
+            positions.push((Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5);
             color.setHSL(Math.random() * 0.1 + 0.05, 1, 0.5); // Tons de laranja/vermelho
             colors.push(color.r, color.g, color.b);
         }
@@ -487,10 +487,10 @@ class EnemyManager {
         particleGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
         const particleMaterial = new THREE.PointsMaterial({
-            size: 0.1,
+            size: 0.2,
             vertexColors: true,
             transparent: true,
-            opacity: 0.5,
+            opacity: 0.6,
             sizeAttenuation: true
         });
 
@@ -523,7 +523,7 @@ class EnemyManager {
             size: 0.13,
             vertexColors: true,
             transparent: true,
-            opacity: 0.01,
+            opacity: 0.1,
             sizeAttenuation: true
         });
 
@@ -531,7 +531,7 @@ class EnemyManager {
         points.position.copy(position);
 
         this.scene.add(points);
-        this.particles.push({ mesh: points, life: 1.0, type: 'smoke' }); // Fumaça dura mais
+        this.particles.push({ mesh: points, life: 0.7, type: 'smoke' }); // Fumaça dura mais
     }
 
     updateParticles() {
@@ -541,7 +541,7 @@ class EnemyManager {
 
             if (particle.type === 'explosion') {
                 particle.mesh.material.opacity = particle.life;
-                particle.mesh.scale.multiplyScalar(1.05);
+                particle.mesh.scale.multiplyScalar(1.00);
             } else if (particle.type === 'smoke') {
                 particle.mesh.material.opacity = particle.life * 2; // Fumaça mais sutil
                 particle.mesh.position.y += 0.01; // Fumaça sobe
