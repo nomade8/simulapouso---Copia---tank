@@ -14,11 +14,11 @@ class EnemyManager {
         this.boundarySize = 150; // Aumentado de 60 para 180
         this.changeDirectionInterval = 2000; // Intervalo menor para reavaliar direção
         this.minEnemyDistance = 50;
-        this.maxSpawnAttempts = 10;
+        this.maxSpawnAttempts = 19;
         this.particles = [];
         this.score = 0;
         this.phase = 1; // Fase atual
-        this.enemiesPerPhase = 7;
+        this.enemiesPerPhase = 18;
         this.gameState = 'combat'; // Estados: 'combat', 'landing', 'descanso'
         this.scoreElement = document.createElement('div');
         this.scoreElement.style.position = 'absolute';
@@ -167,33 +167,48 @@ class EnemyManager {
                 const now = Date.now();
                 const dt = enemy._deathLastTime ? (now - enemy._deathLastTime) / 1000 : 0.016;
                 enemy._deathLastTime = now;
-
+    
                 // Integra posição: mantém velocidade horizontal, aplica gravidade em Y
                 if (!enemy.death.velocity) {
                     enemy.death.velocity = new THREE.Vector3(0, -2.5, 0);
                 }
-                enemy.mesh.position.add(enemy.death.velocity.clone().multiplyScalar(dt));
+                
+                // 1. Aplica a gravidade à velocidade vertical
                 enemy.death.velocity.y -= enemy.death.gravity * dt;
-
-                // Aponta nariz para baixo com leve giro
-                const targetPitch = -Math.PI / 2; // -90°
-                const currentPitch = enemy.mesh.rotation.x || 0;
-                enemy.mesh.rotation.x = THREE.MathUtils.lerp(currentPitch, targetPitch, 0.2);
-                enemy.mesh.rotation.y += enemy.death.yawSpin * dt;
-                enemy.mesh.rotation.z += enemy.death.rollSpin * dt;
+                
+                // 2. Calcula a nova posição com base na velocidade atual
+                enemy.mesh.position.addScaledVector(enemy.death.velocity, dt);
+                
+                // --- A SOLUÇÃO ESTÁ AQUI ---
+                // 3. Primeiro aplica o roll acumulado
+                // Versão alternativa - sem lookAt, rotação manual
+                const velocity = enemy.death.velocity.clone().normalize();
+                const yaw = Math.atan2(velocity.x, velocity.z);
+                const pitch = Math.asin(-velocity.y);
+                
+                if (!enemy._totalRoll) enemy._totalRoll = 0;
+                enemy._totalRoll += enemy.death.rollSpin * dt;
+                
+                enemy.mesh.rotation.set(pitch, yaw, enemy._totalRoll);
+                
+                // 4. Faz o avião "olhar" para a direção do seu movimento
+                const lookAtPosition = new THREE.Vector3().copy(enemy.mesh.position).add(enemy.death.velocity);
+                enemy.mesh.lookAt(lookAtPosition);
+                
+                // 5. Reaplica o roll após o lookAt usando rotateZ
+                enemy.mesh.rotateZ(enemy._totalRoll);
                 
                 // Adiciona fumaça durante a queda (a cada 200ms aproximadamente)
                 if (!enemy._lastSmokeTime || now - enemy._lastSmokeTime > 60) {
-
                     // Posição ligeiramente atrás do avião
                     const smokePos = enemy.mesh.position.clone();
                     smokePos.y -= 0.1; // Um pouco abaixo para parecer que sai da parte traseira
                     this.createSmokeEffect(smokePos);
                     enemy._lastSmokeTime = now;
                 }
-
+    
                 // Detecta o chão (raycast) ou fallback por y
-                let groundY = 0;
+                let groundY = 1;
                 const downHit = this.raycastMountains(enemy.mesh.position.clone(), new THREE.Vector3(0, -1, 0), 1000);
                 if (downHit && downHit.point) {
                     groundY = downHit.point.y;
@@ -204,7 +219,7 @@ class EnemyManager {
                     this.enemies.splice(i, 1);
                     continue;
                 }
-
+    
                 // Enquanto morrendo, não aplica mais lógica normal
                 continue;
             }
@@ -478,7 +493,7 @@ class EnemyManager {
         const color = new THREE.Color();
 
         for (let i = 0; i < particleCount; i++) {
-            positions.push((Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5);
+            positions.push((Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 0.9);
             color.setHSL(Math.random() * 0.1 + 0.05, 1, 0.5); // Tons de laranja/vermelho
             colors.push(color.r, color.g, color.b);
         }
@@ -810,7 +825,7 @@ class EnemyManager {
     startEnemyDeathSpiral(enemy) {
         if (!enemy || !enemy.mesh) return;
         enemy.isDying = true;
-
+       
         // Direção horizontal atual e velocidade do inimigo no momento da morte
         const dirXZ = enemy.moveDirection.clone();
         dirXZ.y = 0;
@@ -823,13 +838,13 @@ class EnemyManager {
         // Define estado da queda: velocidade inicial horizontal e leve componente vertical para iniciar o mergulho
         enemy.death = {
             velocity: new THREE.Vector3(
-                dirXZ.x * initialHorizontalSpeed *1.4,
+                dirXZ.x * initialHorizontalSpeed ,
                 -2.5, // inicia descendo suavemente
                 dirXZ.z * initialHorizontalSpeed
             ),
-            gravity: 10.5, // aceleração da gravidade (unidades/s^2)
-            yawSpin: 0.3,  // giro lento para dar vida à queda
-            rollSpin: 2.5 // leve rolamento
+            gravity: 10, // aceleração da gravidade (unidades/s^2)
+            yawSpin: 0.2,  // giro lento para dar vida à queda
+            rollSpin: 3.5 // leve rolamento
         };
 
         // Zera efeitos de rolagem interna para não conflitar

@@ -15,7 +15,7 @@ class TankManager {
         this.minTankDistance = 30;
         this.maxSpawnAttempts = 10;
         this.particles = [];
-        this.tanksPerPhase = 8; // 10 tanques por fase
+        this.tanksPerPhase = 5; // 10 tanques por fase
         this.shootRange = 30; // Alcance de tiro
 
         // Raycaster para checar montanhas

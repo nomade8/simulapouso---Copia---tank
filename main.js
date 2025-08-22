@@ -1134,16 +1134,20 @@ class LandingSimulator {
                 enemy.mesh.updateMatrixWorld(true); // Ensure world matrix is updated
                 const enemyBoundingBox = new THREE.Box3().setFromObject(enemy.mesh); // Added for consistency
                 enemyBoundingBox.expandByScalar(0.1); // Expandir ligeiramente para colisão mais responsiva
-                if (playerBoundingBox.intersectsBox(enemyBoundingBox)) {
+                if (!enemy.isDying && playerBoundingBox.intersectsBox(enemyBoundingBox)) {
                     const damage = 75; // Dano alto por colisão com inimigo
                     this.playerHealth -= damage;
                     this.updateHealthBar();
                     console.log('Colisão com aeronave inimiga!');
                     this.enemyManager.createExplosion(this.airplane.position);
-                    this.scene.remove(enemy.mesh);
-                    this.enemyManager.enemies.splice(i, 1);
+
+                    // Inicia a "espiral da morte" em vez de remover imediatamente
+                    this.enemyManager.startEnemyDeathSpiral(enemy);
+
+                    // Mantém a pontuação prevista para colisão
                     this.enemyManager.score += 50; // Pontos por destruir inimigo em colisão
                     this.enemyManager.updateScoreDisplay();
+
                     if (this.playerHealth <= 0) {
                         this.gameOver = true;
                         this.showGameOverScreen();
