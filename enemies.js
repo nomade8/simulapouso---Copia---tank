@@ -365,16 +365,16 @@ class EnemyManager {
             enemy._yaw += deltaYaw;
             // Normaliza yaw para manter entre -PI e PI
             enemy._yaw = (enemy._yaw + Math.PI) % (2 * Math.PI) - Math.PI;
-            // Calcula e aplica roll baseado na taxa de mudança de yaw (inclinação em curvas)
-            const roll = -deltaYaw * 2; // Ajuste o multiplicador para intensidade do roll
-            enemy.mesh.rotation.set(0, enemy._yaw, roll);
-    
+            
             // --- Roll acompanha a curva ---
             const maxRoll = 0.7;
             // O roll é proporcional à diferença de yaw (quanto mais curva, mais roll)
             let targetRoll = THREE.MathUtils.clamp(-deltaYaw * 20, -maxRoll, maxRoll);
             if (!enemy._roll) enemy._roll = 0;
             enemy._roll = THREE.MathUtils.lerp(enemy._roll, targetRoll, 0.08);
+            
+            // Aplica a rotação final (removendo a linha 370 que causava conflito)
+            enemy.mesh.rotation.set(0, enemy._yaw, enemy._roll);
             enemy.mesh.rotation.z = enemy._roll;
     
             // --- Lógica de Tiro ---
@@ -486,14 +486,14 @@ class EnemyManager {
         explosionSound.volume = 0.05; // Ajuste o volume conforme necessário
         explosionSound.play();
 
-        const particleCount = 150;
+        const particleCount = 100;
         const particleGeometry = new THREE.BufferGeometry();
         const positions = [];
         const colors = [];
         const color = new THREE.Color();
 
         for (let i = 0; i < particleCount; i++) {
-            positions.push((Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 0.9);
+            positions.push((Math.random() - 0.5) * 0.8, (Math.random() - 0.6) * 0.6, (Math.random() - 0.7) * 0.8);
             color.setHSL(Math.random() * 0.1 + 0.05, 1, 0.5); // Tons de laranja/vermelho
             colors.push(color.r, color.g, color.b);
         }
@@ -502,10 +502,10 @@ class EnemyManager {
         particleGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
         const particleMaterial = new THREE.PointsMaterial({
-            size: 0.2,
+            size: 0.15,
             vertexColors: true,
             transparent: true,
-            opacity: 0.6,
+            opacity: 0.7,
             sizeAttenuation: true
         });
 
@@ -513,7 +513,7 @@ class EnemyManager {
         points.position.copy(position);
 
         this.scene.add(points);
-        this.particles.push({ mesh: points, life: 0.6, type: 'explosion' });
+        this.particles.push({ mesh: points, life: 1.2, type: 'explosion' });
     }
 
     createSmokeEffect(position) {
