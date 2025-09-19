@@ -103,6 +103,9 @@ class LandingSimulator {
                 isPitchingDown: false
             };
             
+            // Estado do efeito de "tranco" na câmera
+            this.cameraShake = { frames: 0, totalFrames: 0, intensity: 0 };
+            
             console.log("Iniciando animação...");
             // Start animation after all initialization
             this.animate();
@@ -145,6 +148,7 @@ class LandingSimulator {
         sunLight.shadow.camera.right = 100;
         sunLight.shadow.camera.top = 100;
         sunLight.shadow.camera.bottom = -100;
+        sunLight.shadow.mapSize.autoUpdate = false;
         
        
         
@@ -153,11 +157,13 @@ class LandingSimulator {
         // Luz secundária (preenchimento) para detalhes nas sombras
         const fillLight = new THREE.DirectionalLight('0x8088ff', 0.5); // Tom levemente azulado
         fillLight.position.set(-50, 100, -100);
+        fillLight.shadow.autoUpdate = false;
         this.scene.add(fillLight);
 
         // Luz de realce (rim light) para melhorar a profundidade
         const rimLight = new THREE.DirectionalLight(0xfff0dd, 0.5); // Tom levemente amarelado
         rimLight.position.set(0, 50, -200);
+        rimLight.shadow.autoUpdate = false;
         this.scene.add(rimLight);
     }
 
@@ -736,6 +742,8 @@ class LandingSimulator {
                     shootDirection
                 );
                 this.playShotgunSound();
+                // Pequeno tranco na câmera ao disparar
+                this.startCameraShake(0.17, 6);
             }
         });
    
@@ -929,6 +937,13 @@ class LandingSimulator {
         const audio = new Audio('shotgun.mp3');
         audio.volume = 0.05;
         audio.play();
+    }
+
+    // Inicia o "tranco" na câmera
+    startCameraShake(intensity = 18, frames = 6) {
+        this.cameraShake.intensity = intensity;
+        this.cameraShake.frames = frames;
+        this.cameraShake.totalFrames = frames;
     }
 
     animate() {
@@ -1292,7 +1307,22 @@ class LandingSimulator {
 
         // Update camera position to follow the airplane with lerp
         const targetCameraPosition = this.airplane.position.clone().add(this.cameraOffset.clone().applyQuaternion(this.airplane.quaternion));
-        this.camera.position.lerp(targetCameraPosition, 0.1); // Adjust lerp factor as needed for smoothness
+        
+        // Aplica o efeito de "tranco" (shake) na posição alvo da câmera
+        let finalCameraTarget = targetCameraPosition.clone();
+        if (this.cameraShake.frames > 0 && this.cameraShake.totalFrames > 0) {
+            const t = this.cameraShake.frames / this.cameraShake.totalFrames; // decaimento
+            const shakeAmount = this.cameraShake.intensity * t;
+            const randomOffset = new THREE.Vector3(
+                (Math.random() - 0.5),
+                (Math.random() - 0.5),
+                (Math.random() - 0.5)
+            ).multiplyScalar(shakeAmount);
+            finalCameraTarget.add(randomOffset);
+            this.cameraShake.frames--;
+        }
+
+        this.camera.position.lerp(finalCameraTarget, 0.1); // Adjust lerp factor as needed for smoothness
         this.camera.lookAt(this.airplane.position);
 
         // Update HUD
