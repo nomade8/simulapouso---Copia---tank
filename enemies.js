@@ -493,7 +493,7 @@ class EnemyManager {
         // 1. Flash Inicial (Branco/Amarelo) - Expansão rápida e desaparecimento súbito
         const flashGeo = new THREE.SphereGeometry(0.6, 16, 16);
         const flashMat = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+            color: 0xffff00,
             transparent: true,
             opacity: 0.5,
             depthWrite: false
