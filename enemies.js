@@ -491,22 +491,22 @@ class EnemyManager {
         this.scene.add(group);
 
         // 1. Flash Inicial (Branco/Amarelo) - Expansão rápida e desaparecimento súbito
-        const flashGeo = new THREE.SphereGeometry(0.6, 16, 16);
+        const flashGeo = new THREE.SphereGeometry(0.8, 16, 16);
         const flashMat = new THREE.MeshBasicMaterial({
             color: 0xffff00,
             transparent: true,
-            opacity: 0.5,
+            opacity: 0.6,
             depthWrite: false
         });
         const flash = new THREE.Mesh(flashGeo, flashMat);
         group.add(flash);
 
         // 2. Bola de Fogo Central (Icosaedro para um look levemente facetado/estilizado)
-        const fireballGeo = new THREE.IcosahedronGeometry(0.3, 1);
+        const fireballGeo = new THREE.IcosahedronGeometry(0.6, 1);
         const fireballMat = new THREE.MeshBasicMaterial({
             color: 0xff6600,
             transparent: true,
-            opacity: 1,
+            opacity: 0.6,
             depthWrite: false
         });
         const fireball = new THREE.Mesh(fireballGeo, fireballMat);
@@ -516,7 +516,7 @@ class EnemyManager {
         // 3. Partículas de Fumaça (Esferas cinzas que se expandem)
         const smokeCount = 6;
         const smokes = [];
-        const smokeGeo = new THREE.SphereGeometry(0.08, 8, 8);
+        const smokeGeo = new THREE.SphereGeometry(0.06, 8, 8);
         const smokeMat = new THREE.MeshBasicMaterial({
             color: 0x333333,
             transparent: true,
@@ -602,7 +602,7 @@ class EnemyManager {
     updateParticles() {
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const particle = this.particles[i];
-            particle.life -= particle.deathSpeed || 0.02;
+            particle.life -= particle.deathSpeed || 0.2;
 
             if (particle.type === 'premium_air_explosion') {
                 const life = particle.life;
@@ -618,10 +618,10 @@ class EnemyManager {
 
                 // Update Fireball
                 if (particle.fireball) {
-                    particle.fireball.scale.multiplyScalar(1.04);
+                    particle.fireball.scale.multiplyScalar(1.01);
                     particle.fireball.rotation.x += 0.02;
                     particle.fireball.rotation.z += 0.02;
-                    particle.fireball.material.opacity = life;
+                    particle.fireball.material.opacity = life/1.8;
                     
                     // Muda de amarelo -> laranja -> vermelho
                     const colorFactor = 1 - life;
