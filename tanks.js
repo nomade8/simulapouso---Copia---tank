@@ -318,6 +318,91 @@ class TankManager {
         return distance < collisionThreshold;
     }
 
+    createTankExplosion(position) {
+        // A posição y no chão para que fique uma meia bola certinha
+        const groundPos = new THREE.Vector3(position.x, 0.1, position.z);
+
+        // Criar um grupo para a explosão (bola de fogo)
+        const explosionGroup = new THREE.Group();
+        explosionGroup.position.copy(groundPos);
+
+        // 1. A bola de fogo principal (hemisfério)
+        // phiStart: 0, phiLength: Math.PI * 2, thetaStart: 0, thetaLength: Math.PI / 2 (hemisfério apontando para cima)
+        const fireballGeo = new THREE.SphereGeometry(0.6, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+        const fireballMat = new THREE.MeshBasicMaterial({
+            color: 0xff4400, // Laranja
+            transparent: true,
+            opacity: 1,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+        const fireball = new THREE.Mesh(fireballGeo, fireballMat);
+        
+        // 2. Um núcleo mais claro (amarelo)
+        const coreGeo = new THREE.SphereGeometry(0.4, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+        const coreMat = new THREE.MeshBasicMaterial({
+            color: 0xffbb00, // Amarelo/Laranja claro
+            transparent: true,
+            opacity: 1,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        
+        explosionGroup.add(fireball);
+        explosionGroup.add(core);
+
+        this.scene.add(explosionGroup);
+        this.particles.push({ 
+            mesh: explosionGroup, 
+            fireball: fireball, 
+            core: core, 
+            life: 1.0, 
+            type: 'tank_explosion' 
+        });
+
+        // 3. Partículas de detritos/fumaça
+        const particleCount = 30;
+        const particleGeometry = new THREE.BufferGeometry();
+        const positions = [];
+        const velocities = [];
+
+        for (let i = 0; i < particleCount; i++) {
+            positions.push(0, 0, 0); // Começam do centro local
+            
+            // Direção aleatória formando um hemisfério para cima
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.random() * Math.PI / 2.5; // Maioria vai para cima e pros lados
+            const speed = 0.3 + Math.random() * 0.4; // Velocidade aleatória
+            
+            velocities.push(
+                Math.sin(phi) * Math.cos(theta) * speed,
+                Math.cos(phi) * speed,
+                Math.sin(phi) * Math.sin(theta) * speed
+            );
+        }
+
+        particleGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        
+        const particleMaterial = new THREE.PointsMaterial({
+            color: 0x444444, // Fumaça escura/detritos
+            size: 0.2,
+            transparent: true,
+            opacity: 1
+        });
+
+        const debris = new THREE.Points(particleGeometry, particleMaterial);
+        debris.position.copy(groundPos);
+        this.scene.add(debris);
+        
+        this.particles.push({
+            mesh: debris,
+            velocities: velocities,
+            life: 1.0,
+            type: 'tank_debris'
+        });
+    }
+
     createExplosion(position) {
         const particleCount = 150;
         const particleGeometry = new THREE.BufferGeometry();
@@ -357,10 +442,59 @@ class TankManager {
             if (particle.type === 'explosion') {
                 particle.mesh.material.opacity = particle.life;
                 particle.mesh.scale.multiplyScalar(1.07);
+            } else if (particle.type === 'tank_explosion') {
+                // Diminui opacidade conforme a vida passa
+                particle.fireball.material.opacity = particle.life;
+                particle.core.material.opacity = particle.life;
+                
+                // Transição de cor (esfriando a bola de fogo)
+                const colorFactor = 1 - particle.life;
+                particle.fireball.material.color.lerpColors(new THREE.Color(0xff4400), new THREE.Color(0x331100), colorFactor * 0.1);
+                particle.core.material.color.lerpColors(new THREE.Color(0xffbb00), new THREE.Color(0xff0000), colorFactor * 0.1);
+                
+                // Bola de fogo cresce
+                particle.mesh.scale.multiplyScalar(1.05); 
+            } else if (particle.type === 'tank_debris') {
+                particle.mesh.material.opacity = particle.life;
+                
+                const positions = particle.mesh.geometry.attributes.position.array;
+                for (let j = 0; j < positions.length; j += 3) {
+                    // Atualiza posições com a velocidade
+                    positions[j] += particle.velocities[j];
+                    positions[j+1] += particle.velocities[j+1];
+                    positions[j+2] += particle.velocities[j+2];
+                    
+                    // Aplica gravidade
+                    particle.velocities[j+1] -= 0.015; 
+                    
+                    // Colisão com o chão
+                    if (positions[j+1] < 0) {
+                        positions[j+1] = 0;
+                        particle.velocities[j] *= 0.8; // Atrito no chão
+                        particle.velocities[j+2] *= 0.8;
+                        particle.velocities[j+1] = 0; // Para de cair
+                    }
+                }
+                particle.mesh.geometry.attributes.position.needsUpdate = true;
             }
 
             if (particle.life <= 0) {
                 this.scene.remove(particle.mesh);
+                
+                // Limpeza de memória
+                if (particle.type === 'tank_explosion') {
+                    particle.fireball.geometry.dispose();
+                    particle.fireball.material.dispose();
+                    particle.core.geometry.dispose();
+                    particle.core.material.dispose();
+                } else if (particle.type === 'tank_debris') {
+                    particle.mesh.geometry.dispose();
+                    particle.mesh.material.dispose();
+                } else if (particle.type === 'explosion') {
+                    particle.mesh.geometry.dispose();
+                    particle.mesh.material.dispose();
+                }
+
                 this.particles.splice(i, 1);
             }
         }

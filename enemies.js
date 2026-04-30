@@ -481,88 +481,196 @@ class EnemyManager {
     }
 
     createExplosion(position) {
-        // Adiciona o som da explosão
+        // Som da explosão
         const explosionSound = new Audio('explosion.mp3');
-        explosionSound.volume = 0.05; // Ajuste o volume conforme necessário
+        explosionSound.volume = 0.1;
         explosionSound.play();
 
-        const particleCount = 100;
-        const particleGeometry = new THREE.BufferGeometry();
-        const positions = [];
-        const colors = [];
-        const color = new THREE.Color();
+        const group = new THREE.Group();
+        group.position.copy(position);
+        this.scene.add(group);
 
-        for (let i = 0; i < particleCount; i++) {
-            positions.push((Math.random() - 0.5) * 0.8, (Math.random() - 0.6) * 0.6, (Math.random() - 0.7) * 0.8);
-            color.setHSL(Math.random() * 0.1 + 0.05, 1, 0.5); // Tons de laranja/vermelho
-            colors.push(color.r, color.g, color.b);
-        }
-
-        particleGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        particleGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-        const particleMaterial = new THREE.PointsMaterial({
-            size: 0.15,
-            vertexColors: true,
+        // 1. Flash Inicial (Branco/Amarelo) - Expansão rápida e desaparecimento súbito
+        const flashGeo = new THREE.SphereGeometry(0.6, 16, 16);
+        const flashMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
             transparent: true,
-            opacity: 0.7,
-            sizeAttenuation: true
+            opacity: 0.5,
+            depthWrite: false
+        });
+        const flash = new THREE.Mesh(flashGeo, flashMat);
+        group.add(flash);
+
+        // 2. Bola de Fogo Central (Icosaedro para um look levemente facetado/estilizado)
+        const fireballGeo = new THREE.IcosahedronGeometry(0.3, 1);
+        const fireballMat = new THREE.MeshBasicMaterial({
+            color: 0xff6600,
+            transparent: true,
+            opacity: 1,
+            depthWrite: false
+        });
+        const fireball = new THREE.Mesh(fireballGeo, fireballMat);
+        fireball.rotation.set(Math.random(), Math.random(), Math.random());
+        group.add(fireball);
+
+        // 3. Partículas de Fumaça (Esferas cinzas que se expandem)
+        const smokeCount = 6;
+        const smokes = [];
+        const smokeGeo = new THREE.SphereGeometry(0.08, 8, 8);
+        const smokeMat = new THREE.MeshBasicMaterial({
+            color: 0x333333,
+            transparent: true,
+            opacity: 0.8,
+            depthWrite: false
         });
 
-        const points = new THREE.Points(particleGeometry, particleMaterial);
-        points.position.copy(position);
+        for (let i = 0; i < smokeCount; i++) {
+            const sMat = smokeMat.clone();
+            const s = new THREE.Mesh(smokeGeo, sMat);
+            
+            // Posição inicial levemente aleatória
+            s.position.set(
+                (Math.random() - 0.5) * 0.5,
+                (Math.random() - 0.5) * 0.5,
+                (Math.random() - 0.5) * 0.5
+            );
+            
+            // Direção de expansão
+            s.userData.velocity = s.position.clone().normalize().multiplyScalar(0.08 + Math.random() * 0.05);
+            s.userData.rotSpeed = (Math.random() - 0.5) * 0.1;
+            
+            group.add(s);
+            smokes.push(s);
+        }
 
-        this.scene.add(points);
-        this.particles.push({ mesh: points, life: 1.2, type: 'explosion' });
+        // 4. Faíscas/Destroços (Pequenos cubos rápidos)
+        const sparkCount = 8;
+        const sparks = [];
+        const sparkGeo = new THREE.BoxGeometry(0.1, 0.15, 0.15);
+        const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+
+        for (let i = 0; i < sparkCount; i++) {
+            const spark = new THREE.Mesh(sparkGeo, sparkMat);
+            spark.userData.velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.4,
+                (Math.random() - 0.5) * 0.4,
+                (Math.random() - 0.5) * 0.4
+            );
+            group.add(spark);
+            sparks.push(spark);
+        }
+
+        this.particles.push({
+            type: 'premium_air_explosion',
+            mesh: group,
+            flash: flash,
+            fireball: fireball,
+            smokes: smokes,
+            sparks: sparks,
+            life: 1.0,
+            deathSpeed: 0.02
+        });
     }
 
     createSmokeEffect(position) {
-        const particleCount = 40;
-        const particleGeometry = new THREE.BufferGeometry();
-        const positions = [];
-        const colors = [];
-        const color = new THREE.Color();
-
-        for (let i = 0; i < particleCount; i++) {
-            positions.push((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5);
-            const gray = Math.random() * 0.3 + 0.3; // Tons de cinza
-            color.setRGB(0.05, 0.05, 0.05);
-
-            colors.push(color.r, color.g, color.b);
-        }
-
-        particleGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        particleGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-        const particleMaterial = new THREE.PointsMaterial({
-            size: 0.12,
-            vertexColors: true,
+        const smokeGeo = new THREE.SphereGeometry(0.3, 8, 8);
+        const smokeMat = new THREE.MeshBasicMaterial({
+            color: 0x333333,
             transparent: true,
-            opacity: 1,
-            sizeAttenuation: true
+            opacity: 0.5,
+            depthWrite: false
         });
-
-        const points = new THREE.Points(particleGeometry, particleMaterial);
-        points.position.copy(position);
-
-        this.scene.add(points);
-        this.particles.push({ mesh: points, life: 0.7, type: 'smoke' }); // Fumaça dura mais
+        
+        const smoke = new THREE.Mesh(smokeGeo, smokeMat);
+        smoke.position.copy(position);
+        
+        // Pequena variação aleatória de posição e rotação
+        smoke.position.x += (Math.random() - 0.5) * 0.3;
+        smoke.position.z += (Math.random() - 0.5) * 0.3;
+        smoke.rotation.set(Math.random(), Math.random(), Math.random());
+        
+        this.scene.add(smoke);
+        
+        this.particles.push({ 
+            mesh: smoke, 
+            life: 1.0, 
+            type: 'premium_smoke',
+            deathSpeed: 0.015 + Math.random() * 0.01 
+        });
     }
 
     updateParticles() {
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const particle = this.particles[i];
-            particle.life -= 0.02;
+            particle.life -= particle.deathSpeed || 0.02;
 
-            if (particle.type === 'explosion') {
+            if (particle.type === 'premium_air_explosion') {
+                const life = particle.life;
+
+                // Update Flash (Dura apenas o início da explosão)
+                if (particle.flash) {
+                    particle.flash.scale.multiplyScalar(1.2);
+                    particle.flash.material.opacity = Math.max(0, life * 8 - 7);
+                    if (particle.flash.material.opacity <= 0 && particle.flash.parent) {
+                        particle.flash.parent.remove(particle.flash);
+                    }
+                }
+
+                // Update Fireball
+                if (particle.fireball) {
+                    particle.fireball.scale.multiplyScalar(1.04);
+                    particle.fireball.rotation.x += 0.02;
+                    particle.fireball.rotation.z += 0.02;
+                    particle.fireball.material.opacity = life;
+                    
+                    // Muda de amarelo -> laranja -> vermelho
+                    const colorFactor = 1 - life;
+                    particle.fireball.material.color.lerpColors(
+                        new THREE.Color(0xffcc00),
+                        new THREE.Color(0xff0000),
+                        colorFactor * 1.5
+                    );
+                }
+
+                // Update Smokes
+                particle.smokes.forEach(s => {
+                    s.position.add(s.userData.velocity);
+                    s.position.y += 0.01; // Sobe levemente
+                    s.scale.multiplyScalar(1.03);
+                    s.material.opacity = life * 0.7;
+                    s.rotation.y += s.userData.rotSpeed;
+                });
+
+                // Update Sparks
+                particle.sparks.forEach(s => {
+                    s.position.add(s.userData.velocity);
+                    s.userData.velocity.y -= 0.01; // Gravidade
+                    s.scale.multiplyScalar(0.98); // Diminui
+                });
+
+            } else if (particle.type === 'explosion') {
                 particle.mesh.material.opacity = particle.life;
                 particle.mesh.scale.multiplyScalar(1.00);
-            } else if (particle.type === 'smoke') {
-                particle.mesh.material.opacity = particle.life * 2; // Fumaça mais sutil
+            } else if (particle.type === 'smoke' || particle.type === 'premium_smoke') {
+                particle.mesh.material.opacity = particle.life * (particle.type === 'premium_smoke' ? 0.5 : 2);
                 particle.mesh.position.y += 0.01; // Fumaça sobe
+                if (particle.type === 'premium_smoke') {
+                    particle.mesh.scale.multiplyScalar(1.02); // Expande suavemente
+                }
             }
 
             if (particle.life <= 0) {
+                // Cleanup total
+                if (particle.type === 'premium_air_explosion' || particle.type === 'premium_smoke') {
+                    particle.mesh.traverse(child => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) child.material.dispose();
+                    });
+                } else {
+                    if (particle.mesh.geometry) particle.mesh.geometry.dispose();
+                    if (particle.mesh.material) particle.mesh.material.dispose();
+                }
+                
                 this.scene.remove(particle.mesh);
                 this.particles.splice(i, 1);
             }

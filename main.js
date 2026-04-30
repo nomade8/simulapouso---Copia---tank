@@ -1068,7 +1068,7 @@ class LandingSimulator {
                         this.scene.remove(bullet);
                         this.enemyManager.bullets.splice(i, 1);
                         // Criar explosão
-                        this.tankManager.createExplosion(tank.mesh.position);
+                        this.tankManager.createTankExplosion(tank.mesh.position);
                         this.playExplosionSound();
                         // Pontuação por tiro acertado
                         this.enemyManager.score += 50;
