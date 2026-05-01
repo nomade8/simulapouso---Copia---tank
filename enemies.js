@@ -546,15 +546,15 @@ class EnemyManager {
         // 4. Faíscas/Destroços (Pequenos cubos rápidos)
         const sparkCount = 8;
         const sparks = [];
-        const sparkGeo = new THREE.BoxGeometry(0.1, 0.15, 0.15);
+        const sparkGeo = new THREE.BoxGeometry(0.05, 0.15, 0.15);
         const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
 
         for (let i = 0; i < sparkCount; i++) {
             const spark = new THREE.Mesh(sparkGeo, sparkMat);
             spark.userData.velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 0.4,
-                (Math.random() - 0.5) * 0.4,
-                (Math.random() - 0.5) * 0.4
+                (Math.random() - 0.3) * 0.4,
+                (Math.random() - 0.3) * 0.4,
+                (Math.random() - 0.3) * 0.4
             );
             group.add(spark);
             sparks.push(spark);
@@ -644,7 +644,7 @@ class EnemyManager {
                 // Update Sparks
                 particle.sparks.forEach(s => {
                     s.position.add(s.userData.velocity);
-                    s.userData.velocity.y -= 0.01; // Gravidade
+                    s.userData.velocity.y -= 0.009; // Gravidade
                     s.scale.multiplyScalar(0.98); // Diminui
                 });
 
