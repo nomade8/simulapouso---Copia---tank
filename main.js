@@ -1249,9 +1249,9 @@ class LandingSimulator {
         // --- Update Yaw, Pitch, and Roll based on key states ---
         const turnSpeed = 0.015;
         const pitchSpeed = 0.01;
-        const maxPitch = 0.6;
-        const maxRoll = 0.8;
-        const rollLerpFactor = 0.06;
+        const maxPitch = 0.8;
+        const maxRoll = 0.9;
+        const rollLerpFactor = 0.04;
 
 
         let targetRoll = 0;
