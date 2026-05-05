@@ -106,6 +106,9 @@ class LandingSimulator {
             // Estado do efeito de "tranco" na câmera
             this.cameraShake = { frames: 0, totalFrames: 0, intensity: 0 };
             
+            // Inicializar som do motor
+            this.setupEngineSound();
+
             console.log("Iniciando animação...");
             // Start animation after all initialization
             this.animate();
@@ -805,6 +808,9 @@ class LandingSimulator {
     showGameOverScreen() {
         if (!this.gameOverDisplayed) {
             this.gameOverDisplayed = true;
+            // Pausa o som do motor no Game Over
+            if (this.engineAudio) this.engineAudio.pause();
+
             if (this.gameOverScreen) {
                 // Update the final score
                 if (this.finalScoreElement) {
@@ -839,6 +845,12 @@ class LandingSimulator {
     }
 
     restartGame() {
+        // Reinicia o som do motor
+        if (this.engineAudio) {
+            this.engineAudio.currentTime = 0;
+            this.engineAudio.play().catch(e => console.log("Erro ao reiniciar som:", e));
+        }
+
         // Resetar variáveis do jogo
         this.gameOver = false;
         this.gameOverDisplayed = false;
@@ -926,6 +938,37 @@ class LandingSimulator {
         }
     }
 
+    // Configura o áudio contínuo do motor do avião
+    setupEngineSound() {
+        this.engineAudio = new Audio('continuo.mp3');
+        this.engineAudio.loop = true;
+        this.engineAudio.volume = 0.35; // Volume inicial baixo
+        this.engineAudio.preservesPitch = false; // Permite que o tom mude com a velocidade
+
+        // Inicia o áudio na primeira interação do usuário (exigência do navegador)
+        const startAudio = () => {
+            this.engineAudio.play().catch(e => console.log("Áudio aguardando interação..."));
+            window.removeEventListener('click', startAudio);
+            window.removeEventListener('keydown', startAudio);
+        };
+        window.addEventListener('click', startAudio);
+        window.addEventListener('keydown', startAudio);
+    }
+
+    // Atualiza a frequência do som com base na velocidade do avião
+    updateEngineSound() {
+        if (this.engineAudio && !this.engineAudio.paused) {
+            // Mapeia a velocidade (0 a 20) para a taxa de reprodução (0.5 a 2.0)
+            const minRate = 0.5;
+            const maxRate = 2.0;
+            const speedFactor = this.planeState.speed / 20;
+            const targetRate = minRate + (speedFactor * (maxRate - minRate));
+            
+            // Suaviza a transição da taxa de reprodução
+            this.engineAudio.playbackRate = THREE.MathUtils.lerp(this.engineAudio.playbackRate, targetRate, 0.1);
+        }
+    }
+
     // Reproduz som de explosão
     playExplosionSound() {
         const audio = new Audio('explosion.mp3');
@@ -947,6 +990,9 @@ class LandingSimulator {
     }
 
     animate() {
+        // Atualiza o som do motor com base na velocidade
+        this.updateEngineSound();
+
         // ...som removido...
         if (this.gameOver) {
             this.showGameOverScreen();
