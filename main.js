@@ -1,8 +1,9 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
+import * as THREE from 'https://esm.sh/three@0.175.0';
+import { OrbitControls } from 'https://esm.sh/three@0.175.0/examples/jsm/controls/OrbitControls.js';
+import { MeshBVH, acceleratedRaycast } from 'https://esm.sh/three-mesh-bvh@0.9.0';
 import EnemyManager from './enemies.js';
 import TankManager from './tanks.js';
+import { Sky } from 'https://esm.sh/three@0.175.0/examples/jsm/objects/Sky.js';
 
 // Adiciona o método de raycast acelerado ao protótipo do Mesh
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
@@ -24,7 +25,7 @@ class LandingSimulator {
             
             // Then set scene properties
             this.scene.background = new THREE.Color(0x87CEEB);
-            this.scene.fog = new THREE.FogExp2('#d1c817', 0.0035);
+            this.scene.fog = new THREE.FogExp2('#ecf020', 0.0015);
             
             // Criar elemento de mensagem de pouso
             this.createLandingMessage(); 
@@ -44,7 +45,24 @@ class LandingSimulator {
             
             // Estilos já definidos no HTML
             
-            this.createSkyGradient();
+            // Create sky using three.js Sky object
+            const sky = new Sky();
+            sky.scale.setScalar(450000); // Large enough to cover the horizon
+            this.scene.add(sky);
+
+            const uniforms = sky.material.uniforms;
+            uniforms['turbidity'].value = 1;
+            uniforms['rayleigh'].value = 3;
+            uniforms['mieCoefficient'].value = 0.005;
+            uniforms['mieDirectionalG'].value = 0.8;
+
+            const phi = THREE.MathUtils.degToRad(90 - 2); // elevation angle
+            const theta = THREE.MathUtils.degToRad(180); // azimuth
+
+            const sunPosition = new THREE.Vector3();
+            sunPosition.setFromSphericalCoords(1, phi, theta);
+
+            uniforms['sunPosition'].value.copy(sunPosition);
            
 
             // Iluminação
@@ -172,20 +190,8 @@ class LandingSimulator {
 
     createScene() {
         // Terreno com proporções maiores
-        const groundGeometry = new THREE.PlaneGeometry(400, 400, 100, 100);
-        
-        // Adicionar variação de altura mais suave no terreno
-        const vertices = groundGeometry.attributes.position.array;
-        for (let i = 0; i < vertices.length; i += 3) {
-            const x = vertices[i];
-            const z = vertices[i + 2];
-            // Evitar modificar a área da pista e proximidades - área plana maior
-            if (Math.abs(x) > 205 || Math.abs(z) > 25) {
-                vertices[i + 1] = Math.sin(x / 80) * Math.cos(z / 80) * 4 + 
-                                Math.sin(x / 40 + z / 50) * 2 +
-                                (Math.random() * 0.5);
-            }
-        }
+        const groundGeometry = new THREE.PlaneGeometry(600, 600, 100, 100);
+            
         
         groundGeometry.computeVertexNormals();
         groundGeometry.boundsTree = new MeshBVH(groundGeometry);
@@ -247,7 +253,7 @@ class LandingSimulator {
 
         const groundMaterial = new THREE.MeshStandardMaterial({ 
             map: terrainTexture,
-            color: '#ffffff',
+            color: '#fdfdfd',
             roughness: 0.9,
             metalness: 0.0,
             flatShading: false
@@ -1381,28 +1387,7 @@ class LandingSimulator {
         requestAnimationFrame(() => this.animate());
     }
 
-    // --- Add the missing createSkyGradient method definition ---
-    createSkyGradient() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 2; // Minimal width needed
-        canvas.height = 256; // Height determines gradient resolution
-
-        const context = canvas.getContext('2d');
-        const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-        
-        // Define gradient colors: Yellow at bottom, Blue/Purple at top
-        gradient.addColorStop(0, '#4a0e8a'); // Darker Purple/Blue at the top (y=0)
-        gradient.addColorStop(0.4, '#fcba03'); // Transition to Sky Blue
-        gradient.addColorStop(1, '#fcba03'); // Light Yellow/Cream at the bottom (y=canvas.height)
-
-        context.fillStyle = gradient;
-        context.fillRect(0, 0, canvas.width, canvas.height);
-
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.needsUpdate = true; // Ensure texture updates
-        this.scene.background = texture;
-    }
-    // --- End of createSkyGradient method ---
+    
 
     setupCamera() {
         this.camera.position.copy(this.airplane.position).add(this.cameraOffset);
