@@ -33,9 +33,9 @@ class EnemyManager {
         this.shootRange = 20; // Adicionando range de tiro
 
         // Parâmetros de colisão/evitação (ajustes finos)
-        this.collisionSkin = 0.6;              // distância mínima para ficar “fora” da superfície
+        this.collisionSkin = 0.6;              // distância mínima para ficar "fora" da superfície
         this.maxCorrectionPerFrame = 0.3;      // limite de correção de posição por frame
-        this.avoidPersistMs = 250;             // “memória” de desvio após detectar montanha
+        this.avoidPersistMs = 250;             // "memória" de desvio após detectar montanha
 
         // Raycaster com BVH
         this.raycaster = new THREE.Raycaster();
@@ -121,7 +121,7 @@ class EnemyManager {
         tailPlane.position.set(0, 0, -1.6);
         enemy.add(tailPlane);
 
-       
+        
 
         // Use the validated spawn position and set initial orientation
         enemy.position.copy(spawnPosition);
@@ -243,7 +243,7 @@ class EnemyManager {
                 enemy.moveDirection.lerp(newDir, 0.35).normalize(); // Aumentar lerp para seguir mais rápido
                 enemy.lastDirectionChange = now;
                 
-               
+                
             }
     
             // Verificações de limites X e Z com curva mais aberta ao longo da borda
@@ -314,7 +314,7 @@ class EnemyManager {
             }
     
             if (bounced) {
-                // Normaliza direção e alinha yaw imediatamente para não “andar de ré”
+                // Normaliza direção e alinha yaw imediatamente para não "andar de ré"
                 enemy.moveDirection.y = 0;
                 enemy.moveDirection.normalize();
                 const dirXZ = enemy.moveDirection.clone();
@@ -892,7 +892,7 @@ class EnemyManager {
             criticalDist * 0.6
         );
 
-        // Detecção de “movimento mínimo” (travado)
+        // Detecção de "movimento mínimo" (travado)
         const lastPos = enemy._lastPos ? enemy._lastPos.clone() : enemy.mesh.position.clone();
         const moved = enemy.mesh.position.distanceTo(lastPos);
         enemy._lastPos = enemy.mesh.position.clone();
@@ -952,7 +952,7 @@ class EnemyManager {
             ),
             gravity: 10, // aceleração da gravidade (unidades/s^2)
             yawSpin: 0.2,  // giro lento para dar vida à queda
-            rollSpin: 3.5 // leve rolamento
+            rollSpin: 3.5, // leve rolamento
         };
 
         // Zera efeitos de rolagem interna para não conflitar
